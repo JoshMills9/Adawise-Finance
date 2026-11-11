@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ADA_DARK, Chip, DetailHeader, PrimaryButton, card, goBack } from '../components/ada'
 import { GOAL_TYPE_LABEL, ghs, type GoalType } from '../lib/demoData'
-import { useCircles, useGoals } from '../lib/goalStore'
+import { noticeStore, useCircles, useGoals, useSupporting } from '../lib/goalStore'
+import { useToast } from '../components/ui'
 import { useThemeColor } from '../lib/useThemeColor'
-import { CircleCard, ContributionRow, GoalCard, upcoming } from './Adawise'
+import { CircleCard, ContributionRow, GoalCard, SupportedCard, upcoming } from './Adawise'
 
 function ListShell({ title, subtitle, children, cta }: { title: string; subtitle: string; children: React.ReactNode; cta?: { label: string; to: string } }) {
   useThemeColor(ADA_DARK)
@@ -80,6 +81,29 @@ export function ContributionsList() {
         ))}
         {list.length === 0 && <p className="px-4 py-8 text-center text-[14px] text-muted">Nothing due. Nice work!</p>}
       </div>
+    </ListShell>
+  )
+}
+
+export function SupportingList() {
+  const supporting = useSupporting()
+  const [toast, toastNode] = useToast()
+  return (
+    <ListShell title="Goals you support" subtitle={`You're an accountability partner on ${supporting.length} goal${supporting.length === 1 ? '' : 's'}`}>
+      <div className="flex flex-col gap-3">
+        {supporting.map((sg) => (
+          <SupportedCard
+            key={sg.id}
+            goal={sg}
+            onCheer={() => {
+              noticeStore.push({ kind: 'partner', text: `You cheered on ${sg.person} for ${sg.goalName}` })
+              toast(`Encouragement sent to ${sg.person}`)
+            }}
+          />
+        ))}
+        {supporting.length === 0 && <p className="py-10 text-center text-[14px] text-muted">When someone makes you their partner, their goal shows up here.</p>}
+      </div>
+      {toastNode}
     </ListShell>
   )
 }

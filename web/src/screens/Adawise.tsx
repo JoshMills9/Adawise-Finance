@@ -39,6 +39,8 @@ import { goalStore, noticeStore, useCircles, useGoals, useRequests, useSaveMe, u
 const ADA_DARK = '#0F3D3E'
 
 type Icon = ComponentType<{ size?: number }>
+/** Max items per list on the Adawise home; the arrows open the full lists */
+const HOME_LIMIT = 3
 
 function CloseIcon() {
   return (
@@ -208,7 +210,7 @@ export function Adawise() {
         {/* ---- My goals ---- */}
         <SectionHeader title="My goals" onMore={() => navigate('/adawise/goals')} />
         <section className="flex flex-col gap-3 px-4">
-          {goals.map((g) => (
+          {goals.slice(0, HOME_LIMIT).map((g) => (
             <GoalCard key={g.id} goal={g} money={money} onClick={() => navigate(`/adawise/goal/${g.id}`)} />
           ))}
 
@@ -217,7 +219,7 @@ export function Adawise() {
         {/* ---- My circles ---- */}
         <SectionHeader title="My circles" onMore={() => navigate('/adawise/circles')} />
         <section className="flex flex-col gap-3 px-4">
-          {circles.map((c) => (
+          {circles.slice(0, HOME_LIMIT).map((c) => (
             <CircleCard key={c.id} circle={c} onClick={() => navigate(`/adawise/circle/${c.id}`)} />
           ))}
         </section>
@@ -225,9 +227,9 @@ export function Adawise() {
         {/* ---- Goals you support (you're their accountability partner) ---- */}
         {supporting.length > 0 && (
           <>
-            <SectionHeader title="Goals you support" onMore={() => navigate('/adawise/requests')} />
+            <SectionHeader title="Goals you support" onMore={() => navigate('/adawise/supporting')} />
             <section className="flex flex-col gap-3 px-4">
-              {supporting.map((sg) => (
+              {supporting.slice(0, HOME_LIMIT).map((sg) => (
                 <SupportedCard
                   key={sg.id}
                   goal={sg}

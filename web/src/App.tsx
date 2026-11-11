@@ -14,7 +14,7 @@ import { NewCircle } from './screens/NewCircle'
 import { CircleDetail } from './screens/CircleDetail'
 import { RequestDetail, RequestsList } from './screens/Requests'
 import { Notifications } from './screens/Notifications'
-import { CirclesList, ContributionsList, GoalsList } from './screens/Lists'
+import { CirclesList, ContributionsList, GoalsList, SupportingList } from './screens/Lists'
 
 export function App() {
   const location = useLocation()
@@ -50,6 +50,7 @@ export function App() {
             <Route path="/adawise/goals" element={<GoalsList />} />
             <Route path="/adawise/circles" element={<CirclesList />} />
             <Route path="/adawise/contributions" element={<ContributionsList />} />
+            <Route path="/adawise/supporting" element={<SupportingList />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </motion.div>
