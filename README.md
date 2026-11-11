@@ -25,6 +25,19 @@ Splash → Onboarding → Number entry → Identity check → OTP → MoMo home
 
 On the MoMo home, only **Save** is active; other buttons show "Not available in this demo". Tap the profile icon to log out.
 
+### Inside Adawise
+
+| Screen | What you can do |
+|---|---|
+| **Home** | Wallet (total / locked / available), Create goal & Create circle, Save Me left, next contributions, goals, circles, goals you support |
+| **Create goal** | Name & target → Flexible / Goal-locked / Time-locked → saving plan → up to **2 accountability partners** (save with me / cheer me on) → review & first deposit |
+| **Goal details** | Add money, withdraw (or see why it's locked), **Save Me** (ask a partner or get credit against the fixed deposit), plan, 3/6/9/12-month milestones, partners, activity |
+| **Create circle / Circle details** | Target per member, plan, invite members, privacy (amounts or % only); ranked members, nudges, add money |
+| **Requests for you** | Accept a partner invite (create a **Save Me PIN**, accept the terms) and approve a Save Me request with your PIN |
+| **Notifications** | Live unread badge; tap to jump to the goal, circle or request |
+
+Buttons marked **Simulate…** stand in for the other person (e.g. a partner accepting or approving) so the whole story can be shown from one phone. Open the app with `?reset` to start the demo fresh.
+
 ## Run it
 
 Requires Node.js 20+.

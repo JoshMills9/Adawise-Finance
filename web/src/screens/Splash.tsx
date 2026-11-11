@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MomoLogo } from '../components/ui'
 import { session } from '../lib/session'
+import { resetAdawise } from "../lib/goalStore"
 import { NAVY, useThemeColor } from '../lib/useThemeColor'
 
 export function Splash() {
@@ -10,7 +11,10 @@ export function Splash() {
 
   useEffect(() => {
     // Open the app with ?reset to replay onboarding during a demo
-    if (new URLSearchParams(window.location.search).has('reset')) session.reset()
+    if (new URLSearchParams(window.location.search).has('reset')) {
+      session.reset()
+      resetAdawise()
+    }
 
     const t = setTimeout(() => {
       const next = session.isSignedIn() ? '/home' : session.isOnboarded() ? '/welcome' : '/onboarding'

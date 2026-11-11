@@ -18,27 +18,25 @@ import {
   WalletIcon,
 } from '../components/icons'
 import {
-  CIRCLES,
   FIXED_DEPOSITS,
-  GOALS,
+
   GOAL_TYPE_LABEL,
   INTEREST_EARNED,
-  PARTNER_REQUESTS,
-  SAVE_ME,
   WISE_BADGES,
   circleProgress,
   ghs,
   shortDate,
   totals,
+  type Circle,
   type Goal,
+  type SupportedGoal,
 } from '../lib/demoData'
 import { useThemeColor } from '../lib/useThemeColor'
+import { noticeStore, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from "../lib/goalStore"
 
 const ADA_DARK = '#0F3D3E'
 
 type Icon = ComponentType<{ size?: number }>
-const COMING_NEXT = 'Coming next in the demo'
-const NOTIFICATIONS = 2
 
 function CloseIcon() {
   return (
@@ -54,7 +52,15 @@ export function Adawise() {
   const navigate = useNavigate()
   const [toast, toastNode] = useToast()
   const [hidden, setHidden] = useState(false)
-  const { total, locked, available } = totals()
+  const goals = useGoals()
+  const circles = useCircles()
+  const saveMe = useSaveMe()
+  const unread = useUnreadCount()
+  const pending = useRequests().filter((r) => r.status === 'pending')
+  const supporting = useSupporting()
+  const pendingInvites = pending.filter((r) => r.kind === 'invite').length
+  const pendingSaveMe = pending.filter((r) => r.kind === 'saveme').length
+  const { total, locked, available } = totals(goals)
   const money = (n: number) => (hidden ? 'GHS ****' : ghs(n))
 
   return (
@@ -79,14 +85,16 @@ export function Adawise() {
             <h1 className="text-[20px] font-bold tracking-[0.02em] text-white">Adawise</h1>
             <button
               type="button"
-              aria-label="Notifications"
-              onClick={() => toast(COMING_NEXT)}
+              aria-label={`Notifications, ${unread} new`}
+              onClick={() => navigate('/adawise/notifications')}
               className="relative grid size-11 place-items-center text-white active:opacity-60"
             >
               <BellIcon size={28} />
-              <span className="absolute right-[4px] top-[4px] grid h-[18px] min-w-[18px] place-items-center rounded-full bg-white px-1 text-[10px] font-bold text-ink">
-                {NOTIFICATIONS}
-              </span>
+              {unread > 0 && (
+                <span className="absolute right-[4px] top-[4px] grid h-[18px] min-w-[18px] place-items-center rounded-full bg-white px-1 text-[10px] font-bold text-ink">
+                  {unread}
+                </span>
+              )}
             </button>
           </div>
 
@@ -123,8 +131,42 @@ export function Adawise() {
 
         {/* ---- Quick actions ---- */}
         <section className="grid grid-cols-2 gap-3 px-4 pt-4">
-          <QuickAction icon={FlagIcon} title="Create goal" subtitle="Save on your own" onClick={() => toast(COMING_NEXT)} />
-          <QuickAction icon={UsersIcon} title="Create circle" subtitle="Save with others" onClick={() => toast(COMING_NEXT)} />
+          <QuickAction icon={FlagIcon} title="Create goal" subtitle="On your own" onClick={() => navigate("/adawise/new-goal")} />
+          <QuickAction icon={UsersIcon} title="Create circle" subtitle="With others" onClick={() => navigate("/adawise/new-circle")} />
+        </section>
+
+        {/* ---- Requests for you (invites + Save Me asks from people you support) ---- */}
+        <section className="px-4 pt-3">
+            <button
+              type="button"
+              onClick={() => navigate('/adawise/requests')}
+              className={`flex w-full items-center justify-between gap-3 rounded-[16px] px-4 py-[14px] text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)] ${pending.length ? 'bg-white ring-2 ring-ada/40' : 'bg-white'}`}
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="text-ada-dark">
+                  <UsersIcon size={22} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-semibold text-ada-dark">Requests for you</span>
+                  <span className="block truncate text-[12.5px] text-muted">
+                    {pending.length
+                      ? [
+                          pendingSaveMe && `${pendingSaveMe} Save Me request${pendingSaveMe > 1 ? 's' : ''}`,
+                          pendingInvites && `${pendingInvites} invite${pendingInvites > 1 ? 's' : ''}`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : 'All caught up'}
+                  </span>
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                {pending.length > 0 && <span className="rounded-full bg-ada-soft px-2 py-[2px] text-[12px] font-semibold text-ada">{pending.length} new</span>}
+                <span className="text-dot">
+                  <ChevronRight size={18} />
+                </span>
+              </span>
+            </button>
         </section>
 
         {/* ---- Highlights (swipe) ---- */}
@@ -133,7 +175,7 @@ export function Adawise() {
             icon={LifebuoyIcon}
             image="save-me"
             label="Save Me left"
-            value={`${SAVE_ME.allowed - SAVE_ME.used} of ${SAVE_ME.allowed}`}
+            value={`${saveMe.left} of ${saveMe.allowed}`}
             note="Resets 1 Jan"
             tone="from-[#0f3d3e] to-[#14b39f]"
           />
@@ -146,97 +188,55 @@ export function Adawise() {
             tone="from-[#082426] to-[#0f5a55]"
           />
           <Highlight icon={BadgeIcon} image="badges" label="WiseBadges" value={String(WISE_BADGES)} note="Stay steady" tone="from-[#0f3d3e] to-[#2bbfa9]" />
-          <Highlight icon={UsersIcon} image="circles" label="Active circles" value={String(CIRCLES.length)} note="Growing" tone="from-[#0b2f31] to-[#1a7f72]" />
+          <Highlight icon={UsersIcon} image="circles" label="Active circles" value={String(circles.length)} note="Growing" tone="from-[#0b2f31] to-[#1a7f72]" />
         </section>
 
         {/* ---- Next contributions ---- */}
-        <SectionHeader title="Next contributions" onMore={() => toast(COMING_NEXT)} />
+        <SectionHeader title="Next contributions" onMore={() => navigate('/adawise/contributions')} />
         {/* Compact list: one row per upcoming payment */}
         <section className="mx-4 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          {GOALS.filter((g) => g.nextContribution).map((g) => (
-            <div key={g.id} className="flex items-center gap-3 px-[14px] py-[12px]">
-              <span className="grid size-[40px] shrink-0 place-items-center rounded-[12px] bg-ada-soft text-ada">
-                <FlagIcon size={20} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-bold text-ada-dark">{g.name}</p>
-                <p className="truncate text-[12.5px] text-muted">
-                  Due {shortDate(g.nextContribution!.due)} · {g.partner?.role === 'saver' ? 'Circle' : 'Personal'}
-                </p>
-              </div>
-              <p className="shrink-0 text-[15px] font-bold text-ink">{money(g.nextContribution!.amount)}</p>
-              <button
-                type="button"
-                onClick={() => toast(COMING_NEXT)}
-                className="h-[34px] shrink-0 rounded-full bg-ada px-[14px] text-[13px] font-bold text-white active:brightness-110"
-              >
-                Pay
-              </button>
-            </div>
-          ))}
+          {upcoming(goals)
+            .slice(0, 3)
+            .map((g) => (
+              <ContributionRow key={g.id} goal={g} money={money} onPay={() => navigate(`/adawise/goal/${g.id}?action=add`)} />
+            ))}
         </section>
 
         {/* ---- My goals ---- */}
-        <SectionHeader title="My goals" onMore={() => toast(COMING_NEXT)} />
+        <SectionHeader title="My goals" onMore={() => navigate('/adawise/goals')} />
         <section className="flex flex-col gap-3 px-4">
-          {GOALS.map((g) => (
-            <GoalCard key={g.id} goal={g} money={money} onClick={() => toast(COMING_NEXT)} />
+          {goals.map((g) => (
+            <GoalCard key={g.id} goal={g} money={money} onClick={() => navigate(`/adawise/goal/${g.id}`)} />
           ))}
 
-          <button
-            type="button"
-            onClick={() => toast(COMING_NEXT)}
-            className="flex items-center justify-between rounded-[16px] bg-white px-4 py-[14px] shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
-          >
-            <span className="flex items-center gap-3 text-[15px] font-semibold text-ada-dark">
-              <span className="text-ada-dark">
-                <UsersIcon size={22} />
-              </span>
-              Partner requests
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="rounded-full bg-ada-soft px-2 py-[2px] text-[12px] font-semibold text-ada">{PARTNER_REQUESTS} new</span>
-              <span className="text-dot">
-                <ChevronRight size={18} />
-              </span>
-            </span>
-          </button>
         </section>
 
         {/* ---- My circles ---- */}
-        <SectionHeader title="My circles" onMore={() => toast(COMING_NEXT)} />
+        <SectionHeader title="My circles" onMore={() => navigate('/adawise/circles')} />
         <section className="flex flex-col gap-3 px-4">
-          {CIRCLES.map((c) => {
-            const pct = circleProgress(c)
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => toast(COMING_NEXT)}
-                className="rounded-[16px] bg-white p-4 text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[16px] font-bold text-ada-dark">{c.name}</span>
-                  <span className="text-[13px] text-muted">{c.members.length} members</span>
-                </div>
-                <Progress value={pct} />
-                <div className="flex items-center justify-between">
-                  <div className="flex -space-x-[6px]">
-                    {c.members.slice(0, 4).map((m) => (
-                      <Avatar key={m.name} initials={m.initials} ring />
-                    ))}
-                    {c.members.length > 4 && (
-                      <span className="grid size-[28px] place-items-center rounded-full bg-[#e9e9e9] text-[11px] font-bold text-muted ring-2 ring-white">
-                        +{c.members.length - 4}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[13px] text-muted">Group progress {pct}%</span>
-                </div>
-              </button>
-            )
-          })}
+          {circles.map((c) => (
+            <CircleCard key={c.id} circle={c} onClick={() => navigate(`/adawise/circle/${c.id}`)} />
+          ))}
         </section>
+
+        {/* ---- Goals you support (you're their accountability partner) ---- */}
+        {supporting.length > 0 && (
+          <>
+            <SectionHeader title="Goals you support" onMore={() => navigate('/adawise/requests')} />
+            <section className="flex flex-col gap-3 px-4">
+              {supporting.map((sg) => (
+                <SupportedCard
+                  key={sg.id}
+                  goal={sg}
+                  onCheer={() => {
+                    noticeStore.push({ kind: 'partner', text: `You cheered on ${sg.person} for ${sg.goalName} 👏` })
+                    toast(`Encouragement sent to ${sg.person} 👏`)
+                  }}
+                />
+              ))}
+            </section>
+          </>
+        )}
       </main>
       {toastNode}
     </div>
@@ -343,7 +343,16 @@ const TYPE_ICON: Record<Goal['type'], Icon> = {
   flexible: DropletIcon,
 }
 
-function GoalCard({ goal: g, money, onClick }: { goal: Goal; money: (n: number) => string; onClick: () => void }) {
+/** "Saving with Kofi", "Supported by Esi & Yaw", "Invites sent to Kofi & Esi"… */
+function partnerSummary(ps: NonNullable<Goal['partners']>) {
+  const names = ps.map((p) => p.name).join(' & ')
+  if (ps.every((p) => p.status === 'invited')) return `${ps.length > 1 ? 'Invites' : 'Invite'} sent to ${names}`
+  if (ps.every((p) => p.role === 'saver')) return `Saving with ${names}`
+  if (ps.every((p) => p.role === 'supporter')) return `Supported by ${names}`
+  return names
+}
+
+export function GoalCard({ goal: g, money, onClick }: { goal: Goal; money: (n: number) => string; onClick: () => void }) {
   const I = TYPE_ICON[g.type]
   const pct = Math.round((g.saved / g.target) * 100)
   const unlock: ReactNode =
@@ -370,13 +379,92 @@ function GoalCard({ goal: g, money, onClick }: { goal: Goal; money: (n: number) 
       </div>
       <div className="mt-2 flex items-center justify-between text-[12.5px] text-muted">
         <span>{unlock}</span>
-        {g.partner && (
-          <span className="flex items-center gap-[6px]">
-            <Avatar initials={g.partner.initials} />
-            {g.partner.role === 'saver' ? `Saving with ${g.partner.name}` : `Supported by ${g.partner.name}`}
+        {g.partners?.length ? (
+          <span className="flex min-w-0 items-center gap-[6px]">
+            <span className="flex shrink-0 -space-x-[5px]">
+              {g.partners.map((p) => (
+                <Avatar key={p.name} initials={p.initials} ring />
+              ))}
+            </span>
+            <span className="truncate">{partnerSummary(g.partners)}</span>
           </span>
-        )}
+        ) : null}
       </div>
     </button>
+  )
+}
+
+/** Goals with a next contribution, soonest first */
+export const upcoming = (goals: Goal[]) =>
+  goals.filter((g) => g.nextContribution).sort((a, b) => a.nextContribution!.due.localeCompare(b.nextContribution!.due))
+
+export function ContributionRow({ goal: g, money, onPay }: { goal: Goal; money: (n: number) => string; onPay: () => void }) {
+  return (
+    <div className="flex items-center gap-3 px-[14px] py-[12px]">
+      <span className="grid size-[40px] shrink-0 place-items-center rounded-[12px] bg-ada-soft text-[20px]">{g.emoji ?? '🎯'}</span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-bold text-ada-dark">{g.name}</p>
+        <p className="truncate text-[12.5px] text-muted">
+          Due {shortDate(g.nextContribution!.due)} · {g.partners?.some((p) => p.role === 'saver') ? 'Circle' : 'Personal'}
+        </p>
+      </div>
+      <p className="shrink-0 text-[15px] font-bold text-ink">{money(g.nextContribution!.amount)}</p>
+      <button type="button" onClick={onPay} className="h-[34px] shrink-0 rounded-full bg-ada px-[14px] text-[13px] font-bold text-white active:brightness-110">
+        Pay
+      </button>
+    </div>
+  )
+}
+
+export function CircleCard({ circle: c, onClick }: { circle: Circle; onClick: () => void }) {
+  const pct = circleProgress(c)
+  return (
+    <button type="button" onClick={onClick} className="rounded-[16px] bg-white p-4 text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+      <div className="flex items-center justify-between">
+        <span className="text-[16px] font-bold text-ada-dark">
+          {c.emoji} {c.name}
+        </span>
+        <span className="text-[13px] text-muted">{c.members.length} members</span>
+      </div>
+      <Progress value={pct} />
+      <div className="flex items-center justify-between">
+        <div className="flex -space-x-[6px]">
+          {c.members.slice(0, 4).map((m) => (
+            <Avatar key={m.name} initials={m.initials} ring />
+          ))}
+          {c.members.length > 4 && (
+            <span className="grid size-[30px] place-items-center rounded-full bg-[#e9e9e9] text-[11px] font-bold text-muted ring-2 ring-white">
+              +{c.members.length - 4}
+            </span>
+          )}
+        </div>
+        <span className="text-[13px] text-muted">Group progress {pct}%</span>
+      </div>
+    </button>
+  )
+}
+
+export function SupportedCard({ goal: s, onCheer }: { goal: SupportedGoal; onCheer: () => void }) {
+  const pct = Math.min(100, Math.round((s.saved / s.target) * 100))
+  return (
+    <div className="rounded-[16px] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+      <div className="flex items-center gap-3">
+        <Avatar initials={s.initials} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-bold text-ada-dark">
+            {s.person} · {s.emoji} {s.goalName}
+          </p>
+          <p className="truncate text-[12.5px] text-muted">{s.streak}</p>
+        </div>
+        <button type="button" onClick={onCheer} className="h-[32px] shrink-0 rounded-full border-2 border-ada px-3 text-[13px] font-semibold text-ada active:bg-ada-soft">
+          Cheer 👏
+        </button>
+      </div>
+      <Progress value={pct} />
+      <div className="flex justify-between text-[12.5px] text-muted">
+        <span>{GOAL_TYPE_LABEL[s.type]} · {s.role === 'saver' ? 'Saving together' : 'You support'}</span>
+        <span className="font-semibold text-ada">{pct}%</span>
+      </div>
+    </div>
   )
 }

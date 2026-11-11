@@ -8,6 +8,13 @@ import { Otp } from './screens/Otp'
 import { Home } from './screens/Home'
 import { Save } from './screens/Save'
 import { Adawise } from './screens/Adawise'
+import { NewGoal } from './screens/NewGoal'
+import { GoalDetail } from './screens/GoalDetail'
+import { NewCircle } from './screens/NewCircle'
+import { CircleDetail } from './screens/CircleDetail'
+import { RequestDetail, RequestsList } from './screens/Requests'
+import { Notifications } from './screens/Notifications'
+import { CirclesList, ContributionsList, GoalsList } from './screens/Lists'
 
 export function App() {
   const location = useLocation()
@@ -33,6 +40,16 @@ export function App() {
             <Route path="/home" element={<Home />} />
             <Route path="/save" element={<Save />} />
             <Route path="/adawise" element={<Adawise />} />
+            <Route path="/adawise/new-goal" element={<NewGoal />} />
+            <Route path="/adawise/goal/:id" element={<GoalDetail />} />
+            <Route path="/adawise/new-circle" element={<NewCircle />} />
+            <Route path="/adawise/circle/:id" element={<CircleDetail />} />
+            <Route path="/adawise/requests" element={<RequestsList />} />
+            <Route path="/adawise/requests/:id" element={<RequestDetail />} />
+            <Route path="/adawise/notifications" element={<Notifications />} />
+            <Route path="/adawise/goals" element={<GoalsList />} />
+            <Route path="/adawise/circles" element={<CirclesList />} />
+            <Route path="/adawise/contributions" element={<ContributionsList />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </motion.div>
