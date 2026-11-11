@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react"
 import type { NavigateFunction } from "react-router-dom"
 import { ghs } from '../lib/demoData'
 import { PERIODS, amountOf, cleanAmount } from '../lib/format'
+import { BulbIcon, CheckMark } from './goalIcons'
 
 export type Icon = ComponentType<{ size?: number }>
 export const ADA_DARK = '#0F3D3E'
@@ -254,7 +255,7 @@ export function ToggleRow({ title, desc, on, onChange }: { title: string; desc: 
 export function Note({ children }: { children: ReactNode }) {
   return (
     <p className="mt-6 flex gap-2 rounded-[14px] bg-ada-soft px-4 py-3 text-[13px] leading-relaxed text-ada-dark">
-      <span aria-hidden>💡</span>
+      <BulbIcon size={18} className="mt-[1px] shrink-0 text-ada" />
       <span>{children}</span>
     </p>
   )
@@ -334,7 +335,7 @@ export function Tag({ children, tone = 'grey' }: { children: ReactNode; tone?: '
 export function SuccessRow({ text }: { text: string }) {
   return (
     <div className="flex items-start gap-3 px-4 py-3 text-[14px] text-white/90">
-      <span className="mt-[2px] text-ada">✓</span>
+      <CheckMark size={16} className="mt-[3px] shrink-0 text-ada" />
       <span>{text}</span>
     </div>
   )

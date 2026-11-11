@@ -15,7 +15,7 @@ import {
   type PartnerRequest,
   type SupportedGoal,
 } from "./demoData"
-import { todayIso, uid } from './format'
+import { iso, todayIso, uid } from './format'
 
 function createStore<T>(key: string, seed: T, migrate?: (raw: unknown) => T) {
   const listeners = new Set<() => void>()
@@ -67,7 +67,7 @@ const migrateGoals = (raw: unknown) =>
     partners: g.partners ?? (partner ? [partner] : undefined),
   }))
 
-const goals = createStore<Goal[]>('adawise.goals', GOALS, migrateGoals)
+const goals = createStore<Goal[]>('adawise.goals.v2', GOALS, migrateGoals)
 
 export const goalStore = {
   add: (g: Goal) => goals.set([g, ...goals.get()]),
@@ -80,6 +80,18 @@ export const goalStore = {
       activity: [{ id: uid('a'), kind, amount, date: todayIso(), note }, ...(g.activity ?? [])],
     }))
   },
+  /** Pays a goal's next scheduled contribution and rolls the due date forward one period */
+  payContribution(id: string) {
+    const g = goals.get().find((x) => x.id === id)
+    if (!g?.nextContribution) return
+    const { amount, due } = g.nextContribution
+    goalStore.record(id, 'deposit', amount, +amount, 'Scheduled saving')
+    const next = new Date(due + 'T00:00:00')
+    const f = g.plan?.frequency ?? 'weekly'
+    if (f === 'monthly') next.setMonth(next.getMonth() + 1)
+    else next.setDate(next.getDate() + (f === 'daily' ? 1 : 7))
+    goalStore.update(id, (x) => ({ ...x, nextContribution: { amount, due: iso(next) } }))
+  },
   reset: goals.reset,
 }
 export const useGoals = () => goals.useValue()
@@ -87,7 +99,7 @@ export const useGoal = (id: string | undefined) => useGoals().find((g) => g.id =
 
 /* ---------- circles ---------- */
 
-const circles = createStore<Circle[]>('adawise.circles', CIRCLES)
+const circles = createStore<Circle[]>('adawise.circles.v2', CIRCLES)
 
 export const circleStore = {
   add: (c: Circle) => circles.set([c, ...circles.get()]),
@@ -119,7 +131,7 @@ export function useSaveMe() {
 
 /* ---------- notifications ---------- */
 
-const notices = createStore<Notice[]>('adawise.notices', NOTICES)
+const notices = createStore<Notice[]>('adawise.notices.v2', NOTICES)
 
 export const noticeStore = {
   push: (n: Omit<Notice, 'id' | 'date' | 'read'>) => notices.set([{ ...n, id: uid('n'), date: todayIso(), read: false }, ...notices.get()]),
@@ -131,7 +143,7 @@ export const useUnreadCount = () => useNotices().filter((n) => !n.read).length
 
 /* ---------- requests sent to you (invites + Save Me) ---------- */
 
-const requests = createStore<PartnerRequest[]>('adawise.requests', REQUESTS)
+const requests = createStore<PartnerRequest[]>('adawise.requests.v2', REQUESTS)
 
 export const requestStore = {
   update: (id: string, patch: Partial<PartnerRequest>) =>
@@ -143,7 +155,7 @@ export const useRequest = (id: string | undefined) => useRequests().find((r) => 
 
 /* ---------- goals you support ---------- */
 
-const supporting = createStore<SupportedGoal[]>('adawise.supporting', SUPPORTING)
+const supporting = createStore<SupportedGoal[]>('adawise.supporting.v2', SUPPORTING)
 
 export const supportStore = {
   add: (s: SupportedGoal) => supporting.set([s, ...supporting.get().filter((x) => x.id !== s.id)]),

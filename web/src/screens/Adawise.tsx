@@ -32,7 +32,9 @@ import {
   type SupportedGoal,
 } from '../lib/demoData'
 import { useThemeColor } from '../lib/useThemeColor'
-import { noticeStore, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from "../lib/goalStore"
+import { Glyph } from '../components/goalIcons'
+import { MoneySheet } from '../components/ada'
+import { goalStore, noticeStore, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from "../lib/goalStore"
 
 const ADA_DARK = '#0F3D3E'
 
@@ -52,6 +54,7 @@ export function Adawise() {
   const navigate = useNavigate()
   const [toast, toastNode] = useToast()
   const [hidden, setHidden] = useState(false)
+  const [paying, setPaying] = useState<Goal | null>(null)
   const goals = useGoals()
   const circles = useCircles()
   const saveMe = useSaveMe()
@@ -198,7 +201,7 @@ export function Adawise() {
           {upcoming(goals)
             .slice(0, 3)
             .map((g) => (
-              <ContributionRow key={g.id} goal={g} money={money} onPay={() => navigate(`/adawise/goal/${g.id}?action=add`)} />
+              <ContributionRow key={g.id} goal={g} money={money} onPay={() => setPaying(g)} />
             ))}
         </section>
 
@@ -229,8 +232,8 @@ export function Adawise() {
                   key={sg.id}
                   goal={sg}
                   onCheer={() => {
-                    noticeStore.push({ kind: 'partner', text: `You cheered on ${sg.person} for ${sg.goalName} 👏` })
-                    toast(`Encouragement sent to ${sg.person} 👏`)
+                    noticeStore.push({ kind: 'partner', text: `You cheered on ${sg.person} for ${sg.goalName}` })
+                    toast(`Encouragement sent to ${sg.person}`)
                   }}
                 />
               ))}
@@ -238,6 +241,20 @@ export function Adawise() {
           </>
         )}
       </main>
+      {/* Pay a scheduled contribution right here: straight to payment approval */}
+      <MoneySheet
+        open={paying !== null}
+        mode="deposit"
+        title="Confirm payment"
+        to={paying?.name ?? ""}
+        fixedAmount={paying?.nextContribution?.amount}
+        onClose={() => setPaying(null)}
+        onDone={(amt) => {
+          if (paying) goalStore.payContribution(paying.id)
+          toast(`${ghs(amt)} saved to ${paying?.name}`)
+          setPaying(null)
+        }}
+      />
       {toastNode}
     </div>
   )
@@ -401,7 +418,9 @@ export const upcoming = (goals: Goal[]) =>
 export function ContributionRow({ goal: g, money, onPay }: { goal: Goal; money: (n: number) => string; onPay: () => void }) {
   return (
     <div className="flex items-center gap-3 px-[14px] py-[12px]">
-      <span className="grid size-[40px] shrink-0 place-items-center rounded-[12px] bg-ada-soft text-[20px]">{g.emoji ?? '🎯'}</span>
+      <span className="grid size-[40px] shrink-0 place-items-center rounded-[12px] bg-ada-soft text-ada">
+        <Glyph name={g.icon} size={20} />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-bold text-ada-dark">{g.name}</p>
         <p className="truncate text-[12.5px] text-muted">
@@ -422,7 +441,10 @@ export function CircleCard({ circle: c, onClick }: { circle: Circle; onClick: ()
     <button type="button" onClick={onClick} className="rounded-[16px] bg-white p-4 text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between">
         <span className="text-[16px] font-bold text-ada-dark">
-          {c.emoji} {c.name}
+          <span className="inline-flex items-center gap-2">
+            <Glyph name={c.icon} size={18} className="text-ada" />
+            {c.name}
+          </span>
         </span>
         <span className="text-[13px] text-muted">{c.members.length} members</span>
       </div>
@@ -452,12 +474,12 @@ export function SupportedCard({ goal: s, onCheer }: { goal: SupportedGoal; onChe
         <Avatar initials={s.initials} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold text-ada-dark">
-            {s.person} · {s.emoji} {s.goalName}
+            {s.person} · {s.goalName}
           </p>
           <p className="truncate text-[12.5px] text-muted">{s.streak}</p>
         </div>
         <button type="button" onClick={onCheer} className="h-[32px] shrink-0 rounded-full border-2 border-ada px-3 text-[13px] font-semibold text-ada active:bg-ada-soft">
-          Cheer 👏
+          Cheer
         </button>
       </div>
       <Progress value={pct} />

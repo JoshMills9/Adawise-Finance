@@ -26,6 +26,7 @@ import { firstName } from '../lib/format'
 import { DEMO_WALLET } from '../components/ada'
 import { noticeStore, partnerProfile, requestStore, supportStore, useHasSaveMePin, useRequest, useRequests } from '../lib/goalStore'
 import { useThemeColor } from '../lib/useThemeColor'
+import { BlockMark, CheckCircle, Glyph } from '../components/goalIcons'
 
 /* ======================= list ======================= */
 
@@ -49,7 +50,9 @@ export function RequestsList() {
           <SectionTitle title="Waiting for you" action={<Tag tone={pending.length ? 'teal' : 'grey'}>{pending.length}</Tag>} />
           {pending.length === 0 ? (
             <div className={`${card} px-4 py-8 text-center`}>
-              <p className="text-[28px]">🎉</p>
+              <span className="mx-auto grid size-[52px] place-items-center rounded-full bg-ada-soft text-ada">
+                <CheckCircle size={28} />
+              </span>
               <p className="mt-2 text-[15px] font-semibold text-ink">You're all caught up</p>
               <p className="mt-1 text-[13px] text-muted">New invitations and Save Me requests will show up here.</p>
             </div>
@@ -97,8 +100,8 @@ function RequestCard({ r, onClick }: { r: PartnerRequest; onClick: () => void })
         </span>
         <span className="mt-[2px] block text-[13.5px] leading-snug text-muted">
           {save
-            ? `${firstName(r.from)} needs ${ghs(r.amount, 0)} for ${r.goalEmoji} ${r.goalName}: "${r.reason}"`
-            : `${firstName(r.from)} wants you to ${r.role === 'saver' ? 'save with them' : 'cheer them on'} for ${r.goalEmoji} ${r.goalName}`}
+            ? `${firstName(r.from)} needs ${ghs(r.amount, 0)} for ${r.goalName}: "${r.reason}"`
+            : `${firstName(r.from)} wants you to ${r.role === 'saver' ? 'save with them' : 'cheer them on'} for ${r.goalName}`}
         </span>
         <span className="mt-1 block text-[12px] text-muted">{shortDate(r.date)}</span>
       </span>
@@ -172,7 +175,7 @@ function InviteFlow({ r, onExit }: { r: InviteRequest; onExit: () => void }) {
       person: name,
       initials: r.initials,
       goalName: r.goalName,
-      emoji: r.goalEmoji,
+      icon: r.goalIcon,
       type: r.goalType,
       saved: r.saved,
       target: r.target,
@@ -187,7 +190,7 @@ function InviteFlow({ r, onExit }: { r: InviteRequest; onExit: () => void }) {
     return (
       <SuccessScreen
         title={`You're ${name}'s partner!`}
-        subtitle={`${r.goalEmoji} ${r.goalName} · ${r.role === 'saver' ? 'Saving together' : 'Supporter'}`}
+        subtitle={`${r.goalName} · ${r.role === 'saver' ? 'Saving together' : 'Supporter'}`}
         rows={[
           `You'll get ${name}'s milestones and progress updates`,
           'Your Save Me PIN is set and ready',
@@ -286,7 +289,10 @@ function InviteFlow({ r, onExit }: { r: InviteRequest; onExit: () => void }) {
       <div className={`${card} mt-5 p-4`}>
         <div className="flex items-center justify-between">
           <p className="text-[16px] font-bold text-ada-dark">
-            {r.goalEmoji} {r.goalName}
+            <span className="inline-flex items-center gap-2">
+              <Glyph name={r.goalIcon} size={20} className="text-ada" />
+              {r.goalName}
+            </span>
           </p>
           <Tag>{GOAL_TYPE_LABEL[r.goalType]}</Tag>
         </div>
@@ -299,10 +305,22 @@ function InviteFlow({ r, onExit }: { r: InviteRequest; onExit: () => void }) {
       <SectionTitle title="As a partner you'll" />
       <div className={`${card} p-4`}>
         <ul className="flex flex-col gap-2 text-[14px] leading-snug text-ink">
-          <li>✅ See {name}'s progress and milestones</li>
-          <li>✅ Send encouragement and reminders</li>
-          <li>✅ Be able to help through Save Me, only if you want to</li>
-          <li>🚫 Never own, control or withdraw their money</li>
+          <li className="flex gap-2">
+            <CheckCircle size={18} className="mt-[1px] shrink-0 text-ada" />
+            <span>See {name}'s progress and milestones</span>
+          </li>
+          <li className="flex gap-2">
+            <CheckCircle size={18} className="mt-[1px] shrink-0 text-ada" />
+            <span>Send encouragement and reminders</span>
+          </li>
+          <li className="flex gap-2">
+            <CheckCircle size={18} className="mt-[1px] shrink-0 text-ada" />
+            <span>Be able to help through Save Me, only if you want to</span>
+          </li>
+          <li className="flex gap-2">
+            <BlockMark size={18} className="mt-[1px] shrink-0 text-[#b93535]" />
+            <span>Never own, control or withdraw their money</span>
+          </li>
         </ul>
       </div>
       {!hasPin && <Note>Next you'll create a 4-digit Save Me PIN and accept the Save Me terms.</Note>}
@@ -332,7 +350,7 @@ function SaveMeFlow({ r, onExit }: { r: SaveMeRequest; onExit: () => void }) {
     setTimeout(() => {
       requestStore.update(r.id, { status: 'approved' })
       supportStore.update(r.supportedId, (s) => ({ ...s, saved: s.saved + r.amount }))
-      noticeStore.push({ kind: 'saveme', text: `You rescued ${name}'s ${r.goalName} with ${ghs(r.amount, 0)} 💚` })
+      noticeStore.push({ kind: 'saveme', text: `You rescued ${name}'s ${r.goalName} with ${ghs(r.amount, 0)}` })
       setStage('done')
     }, 1600)
   }
@@ -341,7 +359,7 @@ function SaveMeFlow({ r, onExit }: { r: SaveMeRequest; onExit: () => void }) {
     return (
       <SuccessScreen
         title={`You saved ${name}!`}
-        subtitle={`${ghs(r.amount)} sent to ${r.goalEmoji} ${r.goalName}`}
+        subtitle={`${ghs(r.amount)} sent to ${r.goalName}`}
         rows={[`${name} has been told you helped`, 'This was a gift, not a loan', `This is ${name}'s ${ordinal} Save Me of ${SAVE_ME.allowed} this year`]}
         action="Done"
         onAction={() => navigate('/adawise', { replace: true })}
@@ -469,7 +487,7 @@ function SaveMeFlow({ r, onExit }: { r: SaveMeRequest; onExit: () => void }) {
         <p className="mt-1 text-[14.5px] text-muted">“{r.reason}”</p>
       </div>
       <div className={`${card} mt-5 divide-y divide-[#eef0f1] text-[14px]`}>
-        <SheetRow label="For goal" value={`${r.goalEmoji} ${r.goalName}`} />
+        <SheetRow label="For goal" value={`${r.goalName}`} />
         <SheetRow label="Requested" value={shortDate(r.date)} />
         <SheetRow label="Save Me use" value={`${ordinal} of ${SAVE_ME.allowed} this year`} />
       </div>

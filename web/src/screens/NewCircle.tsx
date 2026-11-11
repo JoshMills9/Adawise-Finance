@@ -28,16 +28,17 @@ import { MAX_CIRCLE_MEMBERS, ghs, type Circle, type Frequency } from '../lib/dem
 import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, longDate, perLabel, todayIso, uid } from '../lib/format'
 import { circleStore } from '../lib/goalStore'
 import { useThemeColor } from '../lib/useThemeColor'
+import { Glyph } from '../components/goalIcons'
 
 const STEPS = ['Circle', 'Goal', 'Members', 'Review'] as const
 
 const IDEAS = [
-  { emoji: '🏠', name: 'Hostel fund' },
-  { emoji: '✈️', name: 'Group trip' },
-  { emoji: '🎓', name: 'School fees' },
-  { emoji: '🎉', name: 'Celebration' },
-  { emoji: '💼', name: 'Business' },
-  { emoji: '🎄', name: 'Christmas' },
+  { icon: 'home', name: 'Hostel fund' },
+  { icon: 'travel', name: 'Group trip' },
+  { icon: 'school', name: 'School fees' },
+  { icon: 'party', name: 'Celebration' },
+  { icon: 'business', name: 'Business' },
+  { icon: 'gift', name: 'Christmas' },
 ]
 
 const CONTACTS = [
@@ -50,7 +51,7 @@ const CONTACTS = [
 ]
 
 type Draft = {
-  emoji: string
+  icon: string
   name: string
   target: string
   months: number
@@ -67,7 +68,7 @@ export function NewCircle() {
   const [dir, setDir] = useState(1)
   const [paying, setPaying] = useState(false)
   const [created, setCreated] = useState<Circle | null>(null)
-  const [d, setD] = useState<Draft>({ emoji: '👥', name: '', target: '', months: 6, frequency: 'weekly', members: [], showAmounts: false, deposit: '' })
+  const [d, setD] = useState<Draft>({ icon: 'group', name: '', target: '', months: 6, frequency: 'weekly', members: [], showAmounts: false, deposit: '' })
   const set = (p: Partial<Draft>) => setD((prev) => ({ ...prev, ...p }))
 
   const target = amountOf(d.target)
@@ -85,7 +86,7 @@ export function NewCircle() {
     const c: Circle = {
       id: uid('circle'),
       name: d.name.trim(),
-      emoji: d.emoji,
+      icon: d.icon,
       targetPerMember: target,
       months: d.months,
       frequency: d.frequency,
@@ -108,7 +109,7 @@ export function NewCircle() {
     return (
       <SuccessScreen
         title="Your circle is ready!"
-        subtitle={`${created.emoji} ${created.name}`}
+        subtitle={created.name}
         rows={[
           `Invites sent to ${d.members.map((m) => firstName(m.name)).join(', ')}`,
           `Everyone saves towards their own ${ghs(target, 0)}`,
@@ -150,8 +151,8 @@ export function NewCircle() {
                 <StepTitle title="Name your circle" subtitle="A WiseCircle is a group of people saving together, each towards their own goal." />
                 <div className="mt-5 flex flex-wrap gap-2">
                   {IDEAS.map((i) => (
-                    <Chip key={i.name} selected={d.name === i.name} onClick={() => set({ name: i.name, emoji: i.emoji })}>
-                      <span className="mr-1">{i.emoji}</span>
+                    <Chip key={i.name} selected={d.name === i.name} onClick={() => set({ name: i.name, icon: i.icon })}>
+                      <Glyph name={i.icon} size={17} className="mr-1 inline-block align-[-3px]" />
                       {i.name}
                     </Chip>
                   ))}
@@ -163,7 +164,7 @@ export function NewCircle() {
                     maxLength={30}
                     value={d.name}
                     onChange={(e) => set({ name: e.target.value })}
-                    prefix={<span className="text-[20px]">{d.emoji}</span>}
+                    prefix={<Glyph name={d.icon} size={22} className="text-ada" />}
                   />
                 </div>
                 <Note>Everyone owns their own savings. Members can see each other's progress, which keeps the whole group motivated.</Note>
@@ -246,7 +247,9 @@ export function NewCircle() {
                 <StepTitle title="Review your circle" subtitle="Check the details, then add your first saving if you like." />
                 <div className={`${card} mt-5`}>
                   <div className="flex items-center gap-3 border-b border-[#eef0f1] p-4">
-                    <span className="grid size-[46px] place-items-center rounded-[14px] bg-ada-soft text-[24px]">{d.emoji}</span>
+                    <span className="grid size-[46px] place-items-center rounded-[14px] bg-ada-soft text-ada">
+            <Glyph name={d.icon} size={24} />
+          </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[18px] font-bold text-ada-dark">{d.name.trim()}</p>
                       <p className="text-[14px] text-muted">{d.members.length + 1} members incl. you</p>

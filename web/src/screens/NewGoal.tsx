@@ -5,6 +5,7 @@ import { ClockIcon, DropletIcon, LockIcon, UsersIcon } from '../components/icons
 import { GOAL_TYPE_LABEL, MAX_PARTNERS, ghs, type Frequency, type Goal, type GoalType } from '../lib/demoData'
 import { goalStore } from '../lib/goalStore'
 import { useThemeColor } from '../lib/useThemeColor'
+import { Glyph } from '../components/goalIcons'
 import {
   ADA_DARK,
   Check,
@@ -34,7 +35,7 @@ const DEMO_WALLET = '241 234 567'
 type Role = 'saver' | 'supporter'
 type DraftPartner = { name: string; phone: string; role: Role | null }
 type Draft = {
-  emoji: string
+  icon: string
   name: string
   target: string
   type: GoalType | null
@@ -47,12 +48,12 @@ type Draft = {
 }
 
 const SUGGESTIONS = [
-  { emoji: '💻', name: 'Laptop' },
-  { emoji: '🏠', name: 'Rent' },
-  { emoji: '🎓', name: 'School fees' },
-  { emoji: '🚑', name: 'Emergency' },
-  { emoji: '💼', name: 'Business' },
-  { emoji: '✈️', name: 'Travel' },
+  { icon: 'laptop', name: 'Laptop' },
+  { icon: 'home', name: 'Rent' },
+  { icon: 'school', name: 'School fees' },
+  { icon: 'medical', name: 'Emergency' },
+  { icon: 'business', name: 'Business' },
+  { icon: 'travel', name: 'Travel' },
 ]
 
 const CONTACTS = [
@@ -96,7 +97,7 @@ export function NewGoal() {
   const [paying, setPaying] = useState(false)
   const [created, setCreated] = useState<Goal | null>(null)
   const [d, setD] = useState<Draft>({
-    emoji: '🎯',
+    icon: 'target',
     name: '',
     target: '',
     type: null,
@@ -134,7 +135,7 @@ export function NewGoal() {
     const goal: Goal = {
       id: `goal-${Date.now()}`,
       name: d.name.trim(),
-      emoji: d.emoji,
+      icon: d.icon,
       type: d.type!,
       saved: deposit,
       target,
@@ -239,8 +240,8 @@ function StepGoal({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
 
       <div className="mt-5 flex flex-wrap gap-2">
         {SUGGESTIONS.map((s) => (
-          <Chip key={s.name} selected={d.name === s.name} onClick={() => set({ name: s.name, emoji: s.emoji })}>
-            <span className="mr-1">{s.emoji}</span>
+          <Chip key={s.name} selected={d.name === s.name} onClick={() => set({ name: s.name, icon: s.icon })}>
+            <Glyph name={s.icon} size={17} className="mr-1 inline-block align-[-3px]" />
             {s.name}
           </Chip>
         ))}
@@ -253,7 +254,7 @@ function StepGoal({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
           maxLength={30}
           value={d.name}
           onChange={(e) => set({ name: e.target.value })}
-          prefix={<span className="text-[20px]">{d.emoji}</span>}
+          prefix={<Glyph name={d.icon} size={22} className="text-ada" />}
         />
         <Field
           label="Target amount"
@@ -554,7 +555,9 @@ function StepReview({
 
       <div className="mt-5 rounded-[18px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
         <div className="flex items-center gap-3 border-b border-[#eef0f1] p-4">
-          <span className="grid size-[46px] place-items-center rounded-[14px] bg-ada-soft text-[24px]">{d.emoji}</span>
+          <span className="grid size-[46px] place-items-center rounded-[14px] bg-ada-soft text-ada">
+            <Glyph name={d.icon} size={24} />
+          </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[18px] font-bold text-ada-dark">{d.name.trim()}</p>
             <p className="text-[14px] text-muted">Target {ghs(target)}</p>
@@ -623,7 +626,7 @@ function Success({ goal, deposit, onDone }: { goal: Goal; deposit: number; onDon
 
         <h1 className="mt-8 text-[26px] font-bold">Your goal is set!</h1>
         <p className="mt-2 text-[16px] text-white/80">
-          {goal.emoji} {goal.name} · {GOAL_TYPE_LABEL[goal.type]}
+          {goal.name} · {GOAL_TYPE_LABEL[goal.type]}
         </p>
 
         <div className="mt-8 w-full divide-y divide-white/10 rounded-[18px] bg-white/8 text-left ring-1 ring-white/10">

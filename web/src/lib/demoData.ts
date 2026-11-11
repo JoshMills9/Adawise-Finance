@@ -23,7 +23,7 @@ export type Goal = {
   partners?: Partner[]
   nextContribution?: { amount: number; due: string }
   plan?: { frequency: Frequency; months: number; amount: number; autoSave: boolean; reminders: boolean }
-  emoji?: string
+  icon?: string
   activity?: Activity[]
   /** Active Save Me credit taken against this goal's fixed deposit */
   credit?: { amount: number; due: string }
@@ -33,7 +33,7 @@ export type CircleMember = { name: string; initials: string; saved: number; stat
 export type Circle = {
   id: string
   name: string
-  emoji: string
+  icon: string
   /** Every member saves towards their own goal of this amount */
   targetPerMember: number
   months: number
@@ -51,7 +51,7 @@ export const GOALS: Goal[] = [
   {
     id: 'laptop',
     name: 'New laptop',
-    emoji: '💻',
+    icon: 'laptop',
     type: 'goal-locked',
     saved: 3200,
     target: 5000,
@@ -69,7 +69,7 @@ export const GOALS: Goal[] = [
   {
     id: 'rent',
     name: 'Rent',
-    emoji: '🏠',
+    icon: 'home',
     type: 'time-locked',
     saved: 750,
     target: 3000,
@@ -89,7 +89,7 @@ export const GOALS: Goal[] = [
   {
     id: 'emergency',
     name: 'Emergency',
-    emoji: '🚑',
+    icon: 'medical',
     type: 'flexible',
     saved: 200,
     target: 500,
@@ -108,7 +108,7 @@ export const CIRCLES: Circle[] = [
   {
     id: 'hostel',
     name: 'Hostel fund',
-    emoji: '🏠',
+    icon: 'home',
     targetPerMember: 2000,
     months: 6,
     frequency: 'weekly',
@@ -131,7 +131,7 @@ export const CIRCLES: Circle[] = [
   {
     id: 'trip',
     name: 'Family trip',
-    emoji: '✈️',
+    icon: 'travel',
     targetPerMember: 1500,
     months: 9,
     frequency: 'monthly',
@@ -221,7 +221,7 @@ export const CONTACTS = [
   { name: 'Kwame Ofori', phone: '050 333 9090' },
 ]
 
-type RequestBase = { id: string; from: string; initials: string; goalName: string; goalEmoji: string; date: string }
+type RequestBase = { id: string; from: string; initials: string; goalName: string; goalIcon: string; date: string }
 export type InviteRequest = RequestBase & {
   kind: 'invite'
   goalType: GoalType
@@ -247,7 +247,7 @@ export type SupportedGoal = {
   person: string
   initials: string
   goalName: string
-  emoji: string
+  icon: string
   type: GoalType
   saved: number
   target: number
@@ -263,7 +263,7 @@ export const REQUESTS: PartnerRequest[] = [
     from: 'Kwesi Appiah',
     initials: 'KW',
     goalName: 'School fees',
-    goalEmoji: '🎓',
+    goalIcon: 'school',
     amount: 300,
     reason: 'School fees deadline moved forward',
     theirUsed: 1,
@@ -277,7 +277,7 @@ export const REQUESTS: PartnerRequest[] = [
     from: 'Abena Kyei',
     initials: 'AK',
     goalName: 'Wedding',
-    goalEmoji: '💍',
+    goalIcon: 'ring',
     goalType: 'goal-locked',
     target: 8000,
     saved: 2400,
@@ -293,7 +293,7 @@ export const SUPPORTING: SupportedGoal[] = [
     person: 'Kwesi',
     initials: 'KW',
     goalName: 'School fees',
-    emoji: '🎓',
+    icon: 'school',
     type: 'time-locked',
     saved: 1800,
     target: 2500,

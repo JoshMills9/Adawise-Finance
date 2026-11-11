@@ -41,6 +41,7 @@ import {
 import { addMonths, amountOf, cleanAmount, firstName, initials, iso, longDate, perLabel } from '../lib/format'
 import { goalStore, noticeStore, saveMeStore, useGoal, useSaveMe } from '../lib/goalStore'
 import { useThemeColor } from '../lib/useThemeColor'
+import { CheckMark, Glyph } from '../components/goalIcons'
 
 type SheetName = null | 'deposit' | 'withdraw' | 'locked' | 'saveme' | 'partner'
 
@@ -80,7 +81,7 @@ export function GoalDetail() {
         <DetailHeader title="Goal" onBack={back}>
           <div className="flex flex-col items-center px-6 pb-[64px] pt-1 text-center">
             <p className="flex items-center gap-2 text-[20px] font-bold">
-              <span>{goal.emoji ?? '🎯'}</span> {goal.name}
+              <Glyph name={goal.icon} size={22} /> {goal.name}
             </p>
             <span className="mt-2 flex items-center gap-1 rounded-full bg-white/12 px-3 py-[3px] text-[12.5px] font-semibold text-white/90">
               <TypeIcon size={14} /> {GOAL_TYPE_LABEL[goal.type]}
@@ -409,8 +410,8 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
                 const helper = who === 'both' ? partners[0]!.name : who
                 goalStore.record(goal.id, 'rescue', amt, +amt, `Save Me from ${helper} · ${reason}`)
                 saveMeStore.use()
-                noticeStore.push({ kind: 'saveme', text: `${helper} sent ${ghs(amt)} to ${goal.name} through Save Me 💚`, link: `/adawise/goal/${goal.id}` })
-                onToast(`${helper} sent ${ghs(amt)} to ${goal.name} 🎉`)
+                noticeStore.push({ kind: 'saveme', text: `${helper} sent ${ghs(amt)} to ${goal.name} through Save Me`, link: `/adawise/goal/${goal.id}` })
+                onToast(`${helper} sent ${ghs(amt)} to ${goal.name}`)
                 close()
               }}
             >
@@ -518,7 +519,7 @@ function Milestones({ goal }: { goal: Goal }) {
           return (
             <div key={m} className="relative flex w-[36px] flex-col items-center">
               <span className={`grid size-[36px] place-items-center rounded-full text-[13px] font-bold ring-4 ring-white ${done ? 'bg-ada text-white' : 'bg-[#e6ebec] text-muted'}`}>
-                {done ? '✓' : m}
+                {done ? <CheckMark size={16} /> : m}
               </span>
               <span className="mt-2 whitespace-nowrap text-[12px] text-muted">{m} months</span>
             </div>

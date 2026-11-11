@@ -7,6 +7,7 @@ import { CONTACTS, MAX_CIRCLE_MEMBERS, circleProgress, ghs, memberPct, shortDate
 import { addMonths, contribution, firstName, initials, longDate, perLabel } from '../lib/format'
 import { circleStore, noticeStore, useCircle } from '../lib/goalStore'
 import { useThemeColor } from '../lib/useThemeColor'
+import { Glyph, TrophyIcon } from '../components/goalIcons'
 
 export function CircleDetail() {
   useThemeColor(ADA_DARK)
@@ -45,7 +46,7 @@ export function CircleDetail() {
         <DetailHeader title="WiseCircle" onBack={back}>
           <div className="flex flex-col items-center px-6 pb-[64px] pt-1 text-center">
             <p className="flex items-center gap-2 text-[20px] font-bold">
-              <span>{circle.emoji}</span> {circle.name}
+              <Glyph name={circle.icon} size={22} /> {circle.name}
             </p>
             <p className="mt-1 text-[13px] text-white/70">
               {active.length} member{active.length === 1 ? '' : 's'}
@@ -111,7 +112,7 @@ export function CircleDetail() {
                     <div className="min-w-0 flex-1">
                       <p className="text-[15px] font-semibold text-ink">
                         {m.you ? 'You' : m.name}
-                        {i === 0 && pct > 0 && <span className="ml-1">🏆</span>}
+                        {i === 0 && pct > 0 && <TrophyIcon size={15} className="ml-1 inline-block align-[-2px] text-ada" />}
                       </p>
                       <Progress value={pct} className="mt-[6px]" />
                     </div>
@@ -122,7 +123,7 @@ export function CircleDetail() {
                           type="button"
                           onClick={() => {
                             circleStore.log(circle.id, `You nudged ${m.name}`)
-                            toast(`Nudge sent to ${m.name} 👋`)
+                            toast(`Nudge sent to ${m.name}`)
                           }}
                           className="text-[12.5px] font-semibold text-ada"
                         >
