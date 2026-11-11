@@ -31,32 +31,32 @@ export function Welcome() {
     <div className="relative flex h-full flex-col bg-white">
       {/* Curved navy header */}
       <div
-        className="momo-gradient absolute inset-x-0 top-0 h-[calc(350px+env(safe-area-inset-top))]"
+        className="momo-gradient absolute inset-x-0 top-0 h-[calc(350px+env(safe-area-inset-top))] short:h-[calc(290px+env(safe-area-inset-top))]"
         style={{ borderBottomLeftRadius: '50% 44px', borderBottomRightRadius: '50% 44px' }}
       />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
-        <div className="flex justify-center pt-[calc(env(safe-area-inset-top)+80px)]">
+        <div className="flex justify-center pt-[calc(env(safe-area-inset-top)+80px)] short:pt-[calc(env(safe-area-inset-top)+36px)]">
           <MomoLogo iconSize={56} />
         </div>
 
         {/* Card */}
         <form
-          className="mx-5 mt-[52px] rounded-[24px] bg-white px-5 pb-5 pt-[38px] shadow-[0_12px_32px_rgba(0,0,0,0.12)]"
+          className="mx-5 mt-[52px] rounded-[24px] bg-white px-5 pb-5 pt-[38px] narrow:mx-4 narrow:px-4 short:mt-8 short:pt-7 shadow-[0_12px_32px_rgba(0,0,0,0.12)]"
           onSubmit={(e) => {
             e.preventDefault()
             submit()
           }}
         >
-          <h1 className="text-center text-[22px] text-navy">
+          <h1 className="text-center text-[clamp(17px,5.6vw,22px)] text-navy">
             Welcome to <span className="font-semibold">MoMo</span>
           </h1>
 
-          <div className="mt-[40px] flex gap-[13px]">
+          <div className="mt-[40px] flex gap-[13px] narrow:gap-2 short:mt-7">
             <button
               type="button"
               aria-label="Country: Ghana"
-              className="grid h-[80px] w-[69px] shrink-0 place-items-center rounded-[18px] border-[1.5px] border-ink"
+              className="grid h-[80px] w-[69px] shrink-0 narrow:w-[56px] place-items-center rounded-[18px] border-[1.5px] border-ink"
             >
               <GhanaFlag size={30} />
             </button>
@@ -64,7 +64,7 @@ export function Welcome() {
           </div>
         </form>
 
-        <p className="mx-auto mt-[44px] max-w-[300px] text-center text-[15px] leading-[1.45] text-muted">
+        <p className="mx-auto mt-[44px] max-w-[300px] px-4 short:mt-6 text-center text-[15px] leading-[1.45] text-muted">
           By using this app you agree to our{' '}
           <a href="#" className="text-navy" onClick={(e) => e.preventDefault()}>
             Mobile Terms of Use
@@ -108,14 +108,14 @@ function NumberField({ value, onChange }: { value: string; onChange: (v: string)
       </fieldset>
 
       <span
-        className={`pointer-events-none absolute left-[22px] origin-left whitespace-nowrap text-ink transition-all duration-150 ${
-          floated ? '-top-[9px] text-[14px]' : 'top-1/2 -translate-y-1/2 text-[22px]'
+        className={`pointer-events-none absolute left-[22px] origin-left narrow:left-4 whitespace-nowrap text-ink transition-all duration-150 ${
+          floated ? '-top-[9px] text-[14px]' : 'top-1/2 -translate-y-1/2 text-[clamp(17px,5.6vw,22px)]'
         }`}
       >
         {label}
       </span>
 
-      <div className={`absolute inset-0 flex items-center gap-[10px] pl-[22px] pr-3 text-[22px] tracking-wide ${floated ? '' : 'opacity-0'}`}>
+      <div className={`absolute inset-0 flex items-center gap-[10px] pl-[22px] pr-3 narrow:gap-[6px] narrow:pl-4 text-[clamp(17px,5.6vw,22px)] tracking-wide ${floated ? '' : 'opacity-0'}`}>
         <span className="text-muted">{COUNTRY_CODE}</span>
         <input
           type="tel"

@@ -153,7 +153,7 @@ export function Adawise() {
                 </span>
                 <span className="min-w-0">
                   <span className="block text-[15px] font-semibold text-ada-dark">Requests for you</span>
-                  <span className="block truncate text-[12.5px] text-muted">
+                  <span className="block text-[12.5px] leading-snug text-muted">
                     {pending.length
                       ? [
                           pendingSaveMe && `${pendingSaveMe} Save Me request${pendingSaveMe > 1 ? 's' : ''}`,
@@ -269,7 +269,7 @@ function QuickAction({ icon: I, title, subtitle, onClick }: { icon: Icon; title:
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 rounded-[16px] bg-white p-3 text-left shadow-[0_2px_12px_rgba(0,0,0,0.07)] transition active:scale-[0.98]"
+      className="flex items-center gap-3 rounded-[16px] bg-white p-3 text-left shadow-[0_2px_12px_rgba(0,0,0,0.07)] transition active:scale-[0.98] narrow:flex-col narrow:items-start narrow:gap-2"
     >
       <span className="relative grid size-[44px] shrink-0 place-items-center rounded-[12px] bg-ada-soft text-ada">
         <I size={24} />
@@ -306,7 +306,7 @@ function Highlight({
 }) {
   const [photo, setPhoto] = useState(false)
   return (
-    <div className={`relative w-[62%] shrink-0 snap-start overflow-hidden rounded-[18px] bg-gradient-to-br ${tone} p-4 text-white`}>
+    <div className={`relative w-[62%] shrink-0 snap-start narrow:w-[80%] overflow-hidden rounded-[18px] bg-gradient-to-br ${tone} p-4 text-white`}>
       <img
         src={`/adawise/highlights/${image}.jpg`}
         alt=""
@@ -321,7 +321,7 @@ function Highlight({
         </span>
       )}
       <p className="relative text-[14px] font-semibold text-white/90 [text-shadow:0_1px_4px_rgba(0,0,0,0.4)]">{label}</p>
-      <p className="relative mt-1 text-[28px] font-bold leading-tight [text-shadow:0_1px_6px_rgba(0,0,0,0.4)]">{value}</p>
+      <p className="relative mt-1 whitespace-nowrap text-[clamp(22px,7.4vw,28px)] font-bold leading-tight [text-shadow:0_1px_6px_rgba(0,0,0,0.4)]">{value}</p>
       <p className="relative mt-1 text-[13px] text-white/85">{note}</p>
     </div>
   )
@@ -396,10 +396,10 @@ export function GoalCard({ goal: g, money, onClick }: { goal: Goal; money: (n: n
         </span>
         <span className="font-semibold text-ada">{pct}%</span>
       </div>
-      <div className="mt-2 flex items-center justify-between text-[12.5px] text-muted">
-        <span>{unlock}</span>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-[6px] text-[12.5px] text-muted">
+        <span className="whitespace-nowrap">{unlock}</span>
         {g.partners?.length ? (
-          <span className="flex min-w-0 items-center gap-[6px]">
+          <span className="flex min-w-0 max-w-full items-center gap-[6px]">
             <span className="flex shrink-0 -space-x-[5px]">
               {g.partners.map((p) => (
                 <Avatar key={p.name} initials={p.initials} ring />
@@ -426,10 +426,12 @@ export function ContributionRow({ goal: g, money, onPay }: { goal: Goal; money: 
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-bold text-ada-dark">{g.name}</p>
         <p className="truncate text-[12.5px] text-muted">
-          Due {shortDate(g.nextContribution!.due)} · {g.partners?.some((p) => p.role === 'saver') ? 'Circle' : 'Personal'}
+          <span className="hidden narrow:inline">{money(g.nextContribution!.amount)} · </span>
+          Due {shortDate(g.nextContribution!.due)}
+          <span className="narrow:hidden"> · {g.partners?.some((p) => p.role === 'saver') ? 'Circle' : 'Personal'}</span>
         </p>
       </div>
-      <p className="shrink-0 text-[15px] font-bold text-ink">{money(g.nextContribution!.amount)}</p>
+      <p className="shrink-0 text-[15px] font-bold text-ink narrow:hidden">{money(g.nextContribution!.amount)}</p>
       <button type="button" onClick={onPay} className="h-[34px] shrink-0 rounded-full bg-ada px-[14px] text-[13px] font-bold text-white active:brightness-110">
         Pay
       </button>
@@ -475,12 +477,12 @@ export function SupportedCard({ goal: s, onCheer }: { goal: SupportedGoal; onChe
       <div className="flex items-center gap-3">
         <Avatar initials={s.initials} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold text-ada-dark">
+          <p className="text-[15px] font-bold leading-snug text-ada-dark">
             {s.person} · {s.goalName}
           </p>
           <p className="truncate text-[12.5px] text-muted">{s.streak}</p>
         </div>
-        <button type="button" onClick={onCheer} className="h-[32px] shrink-0 rounded-full border-2 border-ada px-3 text-[13px] font-semibold text-ada active:bg-ada-soft">
+        <button type="button" onClick={onCheer} className="h-[32px] shrink-0 rounded-full border-2 border-ada px-3 text-[13px] narrow:px-2 font-semibold text-ada active:bg-ada-soft">
           Cheer
         </button>
       </div>

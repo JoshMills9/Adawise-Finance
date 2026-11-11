@@ -45,19 +45,19 @@ export function Onboarding() {
           {SLIDES.map((s) => (
             <section
               key={s.id}
-              className="flex h-full min-w-0 flex-[0_0_100%] flex-col items-center px-8 pt-[calc(env(safe-area-inset-top)+30px)] text-center"
+              className="flex h-full min-w-0 flex-[0_0_100%] flex-col items-center px-8 pt-[calc(env(safe-area-inset-top)+30px)] text-center narrow:px-5 short:pt-[calc(env(safe-area-inset-top)+12px)]"
             >
               {/* Supplied art has ~9% white margin around the circle, hence the larger box */}
-              <Illustration name={s.id} label={s.title} size="min(350px, 42dvh)" />
-              <h2 className="mt-[clamp(8px,3dvh,26px)] text-[28px] font-semibold leading-tight text-navy">{s.title}</h2>
-              <p className="mt-6 text-[18px] leading-[1.9] text-muted">{s.body}</p>
+              <Illustration name={s.id} label={s.title} size="min(350px, calc(52dvh - 120px), 86vw)" />
+              <h2 className="mt-[clamp(8px,3dvh,26px)] text-[clamp(23px,7vw,28px)] font-semibold leading-tight text-navy">{s.title}</h2>
+              <p className="mt-6 text-[clamp(15.5px,4.8vw,18px)] leading-[1.9] text-muted short:mt-3 short:leading-[1.6]">{s.body}</p>
             </section>
           ))}
         </div>
       </div>
 
       {/* Dots */}
-      <div className="flex shrink-0 items-center justify-center gap-[12px] pb-[24px] pt-3" role="tablist">
+      <div className="flex shrink-0 items-center justify-center gap-[12px] pb-[24px] pt-3 short:pb-[12px] short:pt-1" role="tablist">
         {SLIDES.map((s, i) => (
           <button
             key={s.id}
@@ -74,7 +74,7 @@ export function Onboarding() {
       <Footer>
         <PillButton onClick={() => (isLast ? finish() : embla?.scrollNext())}>{isLast ? 'Get started' : 'Next'}</PillButton>
         {/* Keep the space on the last slide so the button doesn't jump */}
-        <div className="mt-[14px]">{isLast ? <div className="h-[56px]" /> : <TextButton onClick={finish}>Skip</TextButton>}</div>
+        <div className="mt-[14px] short:mt-1">{isLast ? <div className="h-[56px] short:h-[44px]" /> : <TextButton onClick={finish}>Skip</TextButton>}</div>
       </Footer>
     </div>
   )

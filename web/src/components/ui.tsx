@@ -71,7 +71,7 @@ export function TextButton({ children, onClick }: { children: ReactNode; onClick
 
 /** Bottom area that holds the main action, clear of the home indicator */
 export function Footer({ children }: { children: ReactNode }) {
-  return <div className="shrink-0 px-5 pb-[calc(34px+env(safe-area-inset-bottom))]">{children}</div>
+  return <div className="shrink-0 px-5 pb-[calc(34px+env(safe-area-inset-bottom))] short:pb-[calc(16px+env(safe-area-inset-bottom))]">{children}</div>
 }
 
 /* ---------- Top bar ---------- */

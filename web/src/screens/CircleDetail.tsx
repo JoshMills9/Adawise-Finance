@@ -77,17 +77,17 @@ export function CircleDetail() {
                 <Tag tone="teal">{memberPct(circle, me)}%</Tag>
               </div>
               <p className="mt-1 text-[24px] font-bold text-ada-dark">
-                {ghs(me.saved)} <span className="text-[14px] font-medium text-muted">of {ghs(circle.targetPerMember, 0)}</span>
+                {ghs(me.saved)} <span className="whitespace-nowrap text-[14px] font-medium text-muted narrow:block">of {ghs(circle.targetPerMember, 0)}</span>
               </p>
               <Progress value={memberPct(circle, me)} />
               <div className="flex items-center justify-between gap-3">
-                <p className="text-[13px] text-muted">
-                  Plan: {ghs(perPeriod, 0)} / {per}
+                <p className="min-w-0 text-[13px] text-muted">
+                  <span className="whitespace-nowrap">Plan: {ghs(perPeriod, 0)} / {per}</span>
                 </p>
                 <button
                   type="button"
                   onClick={() => setAdding(true)}
-                  className="flex h-[38px] items-center gap-1 rounded-full bg-ada px-4 text-[14px] font-semibold text-white active:brightness-110"
+                  className="flex h-[38px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-ada px-4 narrow:px-3 text-[14px] font-semibold text-white active:brightness-110"
                 >
                   <PlusIcon size={16} /> Add money
                 </button>

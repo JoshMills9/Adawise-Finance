@@ -2,6 +2,10 @@
 @import "@fontsource-variable/quicksand";
 @import "@fontsource-variable/inter";
 
+/* Small-device breakpoints: "narrow" = under 360px wide (iPhone SE 1st gen, small Androids), "short" = under 640px tall */
+@custom-variant narrow (@media (width < 360px));
+@custom-variant short (@media (height < 640px));
+
 /* MoMo design tokens (eyeballed from screenshots — fine-tune with a colour picker) */
 @theme {
   /* Stand-in for MTN Brighter Sans (proprietary): closest Google Font in a side-by-side test.
