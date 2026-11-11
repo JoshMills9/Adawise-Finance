@@ -21,7 +21,7 @@ export function App() {
 
   return (
     // Phone-width column: full screen on mobile, centred "device" on desktop
-    <div className="relative mx-auto h-dvh max-w-[430px] overflow-hidden bg-white shadow-[0_0_40px_rgba(0,0,0,0.12)]">
+    <div className="fixed inset-y-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 overflow-hidden bg-white shadow-[0_0_40px_rgba(0,0,0,0.12)]">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={location.pathname}

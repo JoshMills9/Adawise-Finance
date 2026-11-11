@@ -50,7 +50,7 @@ body,
 
 body {
   margin: 0;
-  background: #dfe5ea; /* shows around the phone column on desktop */
+  background: #ffffff;
   color: var(--color-ink);
   font-family: var(--font-sans);
   /* Quicksand's 400 is thinner than MoMo's body text; 500 + a touch of tracking matches better */
@@ -59,6 +59,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+}
+
+/* The grey backdrop is only for framing the phone column on wider screens.
+   On phones it stays white so no strip of it can show at the screen edges. */
+@media (min-width: 431px) {
+  html,
+  body {
+    background: #dfe5ea;
+  }
 }
 
 button {
