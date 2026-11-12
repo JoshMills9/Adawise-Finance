@@ -48,7 +48,7 @@ const HOME_LIMIT = 3
 /** The swipeable highlight cards (Save Me left, fixed deposits, WiseBadges, circles) */
 const SHOW_HIGHLIGHTS = false
 
-/** Adawise home tab: wallet card (Save / Withdraw) → quick actions → recent activity */
+/** Adawise home tab: wallet card (Save / Withdraw) → quick actions → next contributions → recent activity */
 export function Adawise() {
   useThemeColor(ADA_DARK)
   const navigate = useNavigate()
@@ -64,6 +64,7 @@ export function Adawise() {
   const pendingInvites = pending.filter((r) => r.kind === 'invite').length
   const pendingSaveMe = pending.filter((r) => r.kind === 'saveme').length
   const wallet = useWallet()
+  const [paying, setPaying] = useState<Goal | null>(null)
   const [withdrawing, setWithdrawing] = useState(false)
   const [source, setSource] = useState<WithdrawSource | null>(null)
   const [showAllActivity, setShowAllActivity] = useState(false)
@@ -226,6 +227,17 @@ export function Adawise() {
         </section>
         )}
 
+        {/* ---- Next contributions ---- */}
+        <SectionHeader title="Next contributions" onMore={() => navigate('/adawise/contributions')} />
+        {/* Compact list: one row per upcoming payment; tap a row for the goal, Pay to pay it here */}
+        <section className="mx-4 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+          {upcoming(goals)
+            .slice(0, 3)
+            .map((g) => (
+              <ContributionRow key={g.id} goal={g} money={money} onOpen={() => navigate(`/adawise/goal/${g.id}`)} onPay={() => setPaying(g)} />
+            ))}
+        </section>
+
         {/* ---- Recent activity (all goals + Adawise wallet), expandable ---- */}
         <div className="mt-6 flex items-center justify-between px-4 pb-3">
           <h2 className="text-[19px] font-bold text-ink">Recent activity</h2>
@@ -271,6 +283,20 @@ export function Adawise() {
           </>
         )}
       </main>
+      {/* Pay a scheduled contribution right here: straight to payment approval */}
+      <MoneySheet
+        open={paying !== null}
+        mode="deposit"
+        title="Confirm payment"
+        to={paying?.name ?? ''}
+        fixedAmount={paying?.nextContribution?.amount}
+        onClose={() => setPaying(null)}
+        onDone={(amt) => {
+          if (paying) goalStore.payContribution(paying.id)
+          toast(`${ghs(amt)} saved to ${paying?.name}`)
+          setPaying(null)
+        }}
+      />
       {/* Save: pick a goal, then pay from MoMo */}
       <SaveGoalSheet
         open={saving}
