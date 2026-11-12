@@ -3,6 +3,8 @@ const KEYS = {
   onboarded: 'adawise.onboarded',
   msisdn: 'adawise.msisdn',
   signedIn: 'adawise.signedIn',
+  /** Agreed to the Adawise terms (skips the Adawise welcome + terms next time) */
+  adawiseTerms: 'adawise.termsAccepted',
 } as const
 
 function get(key: string): string | null {
@@ -29,6 +31,9 @@ export const session = {
   /** Full number with country code, e.g. 233241380745 */
   msisdn: () => get(KEYS.msisdn) ?? '',
   setMsisdn: (n: string) => set(KEYS.msisdn, n),
+
+  hasAcceptedAdawiseTerms: () => get(KEYS.adawiseTerms) === '1',
+  acceptAdawiseTerms: () => set(KEYS.adawiseTerms, '1'),
 
   isSignedIn: () => get(KEYS.signedIn) === '1',
   signIn: () => set(KEYS.signedIn, '1'),

@@ -19,6 +19,7 @@ import {
 } from '../components/icons'
 import {
   FIXED_DEPOSITS,
+  SHOW_PARTNER_SIDE,
 
   GOAL_TYPE_LABEL,
   INTEREST_EARNED,
@@ -129,6 +130,7 @@ export function Adawise() {
         </section>
 
         {/* ---- Requests for you (invites + Save Me asks from people you support) ---- */}
+        {SHOW_PARTNER_SIDE && (
         <section className="px-4 pt-3">
             <button
               type="button"
@@ -161,6 +163,7 @@ export function Adawise() {
               </span>
             </button>
         </section>
+        )}
 
         {/* ---- Highlights (swipe) ---- */}
         <section className="mt-5 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
@@ -180,7 +183,7 @@ export function Adawise() {
             note={`Interest earned ${ghs(INTEREST_EARNED, 0)}`}
             tone="from-[#0c1722] to-[#1f3a50]"
           />
-          <Highlight icon={BadgeIcon} image="badges" label="WiseBadges" value={`${badges.filter((b) => b.earned).length} of ${badges.length}`} note="Milestones & partner badges" tone="from-[#12212f] to-[#33566f]" onClick={() => navigate('/adawise/badges')} />
+          <Highlight icon={BadgeIcon} image="badges" label="WiseBadges" value={`${badges.filter((b) => b.earned).length} of ${badges.length}`} note="3, 6, 9 & 12-month milestones" tone="from-[#12212f] to-[#33566f]" onClick={() => navigate('/adawise/badges')} />
           <Highlight icon={UsersIcon} image="circles" label="Active circles" value={String(circles.length)} note="Growing" tone="from-[#12212f] to-[#264257]" />
         </section>
 
@@ -196,7 +199,7 @@ export function Adawise() {
         </section>
 
         {/* ---- Goals you support (you're their accountability partner) ---- */}
-        {supporting.length > 0 && (
+        {SHOW_PARTNER_SIDE && supporting.length > 0 && (
           <>
             <SectionHeader title="Goals you support" onMore={() => navigate('/adawise/supporting')} />
             <section className="flex flex-col gap-3 px-4">

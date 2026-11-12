@@ -7,6 +7,7 @@ import {
   NOTICES,
   REQUESTS,
   SAVE_ME,
+  SHOW_PARTNER_SIDE,
   SUPPORTING,
   type Activity,
   type Circle,
@@ -139,7 +140,9 @@ export const noticeStore = {
   markAllRead: () => notices.set(notices.get().map((n) => (n.read ? n : { ...n, read: true }))),
   reset: notices.reset,
 }
-export const useNotices = () => notices.useValue()
+// While the partner side is hidden, drop notifications that would open request screens
+const visible = (n: Notice) => SHOW_PARTNER_SIDE || !n.link?.startsWith('/adawise/requests')
+export const useNotices = () => notices.useValue().filter(visible)
 export const useUnreadCount = () => useNotices().filter((n) => !n.read).length
 
 /* ---------- requests sent to you (invites + Save Me) ---------- */

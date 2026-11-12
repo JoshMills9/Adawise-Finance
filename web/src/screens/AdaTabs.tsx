@@ -3,7 +3,7 @@ import { useState, type ComponentType, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ADA_DARK, Chip, DEMO_NAME, DEMO_WALLET } from '../components/ada'
 import { ChevronRight, FlagIcon, HomeIcon, PlusIcon, ProfileIcon, SearchIcon, UsersIcon } from '../components/icons'
-import { GOAL_TYPE_LABEL, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
+import { GOAL_TYPE_LABEL, SHOW_PARTNER_SIDE, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
 import { useBadges, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CircleCard, GoalCard } from './Adawise'
@@ -276,8 +276,12 @@ export function ProfileTab() {
 
       <section className="mx-4 mt-4 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
         <Row label="WiseBadges" note={`${earnedBadges} of ${badges.length} earned`} onClick={() => navigate('/adawise/badges')} />
-        <Row label="Requests for you" note={pending ? `${pending} new` : 'All caught up'} onClick={() => navigate('/adawise/requests')} />
-        <Row label="Goals you support" note={`${supporting.length}`} onClick={() => navigate('/adawise/supporting')} />
+        {SHOW_PARTNER_SIDE && (
+          <>
+            <Row label="Requests for you" note={pending ? `${pending} new` : 'All caught up'} onClick={() => navigate('/adawise/requests')} />
+            <Row label="Goals you support" note={`${supporting.length}`} onClick={() => navigate('/adawise/supporting')} />
+          </>
+        )}
         <Row label="Next contributions" onClick={() => navigate('/adawise/contributions')} />
         <Row label="Notifications" note={unread ? `${unread} unread` : undefined} onClick={() => navigate('/adawise/notifications')} />
       </section>

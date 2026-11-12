@@ -17,6 +17,7 @@ import { Notifications } from './screens/Notifications'
 import { ContributionsList, SupportingList } from './screens/Lists'
 import { CirclesTab, GoalsTab, ProfileTab, isAdaTab } from './screens/AdaTabs'
 import { Badges } from './screens/Badges'
+import { AdawiseTerms, AdawiseWelcome } from './screens/AdawiseIntro'
 
 export function App() {
   const location = useLocation()
@@ -42,6 +43,8 @@ export function App() {
             <Route path="/otp" element={<Otp />} />
             <Route path="/home" element={<Home />} />
             <Route path="/save" element={<Save />} />
+            <Route path="/adawise/welcome" element={<AdawiseWelcome />} />
+            <Route path="/adawise/terms" element={<AdawiseTerms />} />
             <Route path="/adawise" element={<Adawise />} />
             <Route path="/adawise/new-goal" element={<NewGoal />} />
             <Route path="/adawise/goal/:id" element={<GoalDetail />} />

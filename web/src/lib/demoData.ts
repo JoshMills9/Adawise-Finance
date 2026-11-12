@@ -310,6 +310,12 @@ export type Notice = {
   kind: 'saveme' | 'invite' | 'milestone' | 'circle' | 'partner' | 'money'
 }
 
+/**
+ * Partner side (requests sent to you, goals you support, partner badges).
+ * Hidden for now; set to true to bring it back everywhere.
+ */
+export const SHOW_PARTNER_SIDE = false
+
 export const NOTICES: Notice[] = [
   { id: 'n4', kind: 'saveme', text: 'Kwesi asked you for a Save Me rescue of GHS 300', date: '2026-11-11', read: false, link: '/adawise/requests/sm-kwesi' },
   { id: 'n3', kind: 'invite', text: 'Abena invited you to support her Wedding goal', date: '2026-11-10', read: false, link: '/adawise/requests/inv-abena' },
@@ -414,5 +420,5 @@ export function computeBadges(input: { goals: Goal[]; circles: Circle[]; support
       progress: { now: Math.min(1, rescues), of: 1, unit: 'rescue' },
     },
   ]
-  return [...saver, ...partner]
+  return SHOW_PARTNER_SIDE ? [...saver, ...partner] : saver
 }

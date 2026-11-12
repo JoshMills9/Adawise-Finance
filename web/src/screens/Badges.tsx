@@ -74,13 +74,15 @@ export function Badges() {
           cols="grid-cols-4 narrow:grid-cols-2"
           onOpen={setOpen}
         />
-        <BadgeGroup
-          title="Partner badges"
-          intro="Earned by supporting other people's savings. Each one comes with a partner incentive."
-          badges={partner}
-          cols="grid-cols-3 narrow:grid-cols-2"
-          onOpen={setOpen}
-        />
+        {partner.length > 0 && (
+          <BadgeGroup
+            title="Partner badges"
+            intro="Earned by supporting other people's savings. Each one comes with a partner incentive."
+            badges={partner}
+            cols="grid-cols-3 narrow:grid-cols-2"
+            onOpen={setOpen}
+          />
+        )}
       </main>
 
       <Sheet open={open !== null} onClose={() => setOpen(null)} label={open?.name ?? 'Badge'}>
