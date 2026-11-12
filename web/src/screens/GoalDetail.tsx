@@ -5,7 +5,6 @@ import { ClockIcon, DropletIcon, LifebuoyIcon, LockIcon, PlusIcon, UsersIcon, Va
 import {
   ADA_DARK,
   Avatar,
-  Chip,
   DetailHeader,
   Field,
   HeartIcon,
@@ -274,14 +273,12 @@ export function GoalDetail() {
 
 /* ---------- Save Me ---------- */
 
-const REASONS = ['Medical', 'School fees', 'Rent', 'Family', 'Business', 'Other']
 
 function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; goal: Goal; left: number; onClose: () => void; onToast: (m: string) => void }) {
   type Stage = 'choose' | 'partner' | 'waiting' | 'credit' | 'crediting'
   const [stage, setStage] = useState<Stage>('choose')
   const [who, setWho] = useState<string>('')
   const [amount, setAmount] = useState('')
-  const [reason, setReason] = useState('')
   const [creditAmt, setCreditAmt] = useState('')
 
   const partners = (goal.partners ?? []).filter((p) => p.status !== 'invited')
@@ -298,7 +295,6 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
       setStage('choose')
       setWho('')
       setAmount('')
-      setReason('')
       setCreditAmt('')
     }, 300)
   }
@@ -379,16 +375,8 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
           <div className="mt-5">
             <Field label="How much do you need?" prefix="GHS" placeholder="0.00" inputMode="decimal" value={amount} onChange={(e) => setAmount(cleanAmount(e.target.value))} />
           </div>
-          <p className="mt-5 text-[14px] font-semibold text-ada-dark">What's it for?</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {REASONS.map((r) => (
-              <Chip key={r} selected={reason === r} onClick={() => setReason(r)}>
-                {r}
-              </Chip>
-            ))}
-          </div>
           <div className="mt-6">
-            <PrimaryButton disabled={!who || amt <= 0 || !reason} onClick={() => setStage('waiting')}>
+            <PrimaryButton disabled={!who || amt <= 0} onClick={() => setStage('waiting')}>
               Send request{who ? ` to ${askLabel}` : ''}
             </PrimaryButton>
           </div>
@@ -400,7 +388,7 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
 
       {stage === 'waiting' && (
         <>
-          <Processing title={`Waiting for ${askLabel}`} subtitle={`${ghs(amt)} · ${reason}`} />
+          <Processing title={`Waiting for ${askLabel}`} subtitle={ghs(amt)} />
           <p className="-mt-4 text-center text-[13.5px] leading-relaxed text-muted">
             {askLabel} gets a MoMo request and approves it with their Save Me PIN. Declined requests don't use up a Save Me.
           </p>
@@ -408,7 +396,7 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
             <PrimaryButton
               onClick={() => {
                 const helper = who === 'both' ? partners[0]!.name : who
-                goalStore.record(goal.id, 'rescue', amt, +amt, `Save Me from ${helper} · ${reason}`)
+                goalStore.record(goal.id, 'rescue', amt, +amt, `Save Me from ${helper}`)
                 saveMeStore.use()
                 noticeStore.push({ kind: 'saveme', text: `${helper} sent ${ghs(amt)} to ${goal.name} through Save Me`, link: `/adawise/goal/${goal.id}` })
                 onToast(`${helper} sent ${ghs(amt)} to ${goal.name}`)
