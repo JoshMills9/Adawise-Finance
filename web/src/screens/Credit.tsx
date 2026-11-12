@@ -1,7 +1,7 @@
 // Save Me credit: what you owe, when it's due, and paying it back.
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ADA_DARK, Chip, DEMO_WALLET, DetailHeader, Field, PrimaryButton, Processing, Progress, Radio, Sheet, SheetRow, card, goBack } from '../components/ada'
+import { ADA_DARK, DEMO_WALLET, DetailHeader, Field, PrimaryButton, Processing, Progress, Radio, Sheet, SheetRow, card, goBack } from '../components/ada'
 import { CheckCircle } from '../components/goalIcons'
 import { VaultIcon } from '../components/icons'
 import { useToast } from '../components/ui'
@@ -174,7 +174,6 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
   const amount = amountOf(value)
   const sourceMax = from === 'wallet' ? Math.min(walletBalance, left) : left
   const tooMuch = amount > sourceMax
-  const half = Math.round((left / 2) * 100) / 100
 
   const finish = useRef<() => void>(() => {})
   finish.current = () => {
@@ -215,16 +214,6 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
                     : undefined
               }
             />
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Chip selected={amount === left} onClick={() => setValue(String(left))}>
-              Full · {ghs(left)}
-            </Chip>
-            {half > 0 && half < left && (
-              <Chip selected={amount === half} onClick={() => setValue(String(half))}>
-                Half · {ghs(half)}
-              </Chip>
-            )}
           </div>
 
           <p className="mt-5 text-[14px] font-semibold text-ada-dark">Pay from</p>
