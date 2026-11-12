@@ -288,6 +288,9 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
   const askLabel = who === 'both' ? partners.map((p) => p.name).join(' & ') : who
   const amt = amountOf(amount)
   const cAmt = amountOf(creditAmt)
+  // A rescue covers the contribution you can't make, so it can't be more than that contribution
+  const due = goal.nextContribution?.amount ?? goal.plan?.amount ?? 0
+  const overDue = amt > due
 
   const close = () => {
     onClose()
@@ -315,9 +318,10 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
           <div className="mt-5 flex flex-col gap-3">
             <Option
               selected={false}
-              disabled={!partners.length || !left}
+              disabled={!partners.length || !left || !due}
               onClick={() => {
                 setWho(partners.length > 1 ? '' : partners[0]!.name)
+                setAmount(String(due))
                 setStage('partner')
               }}
               icon={HeartIcon}
@@ -325,9 +329,11 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
               desc={
                 !left
                   ? "You've used all 3 Save Me rescues this year. They reset on 1 January."
-                  : partners.length
-                    ? 'Your partner can choose to help fund this goal. It’s support, not a loan.'
-                    : 'Add an accountability partner (or wait for them to accept) to use this.'
+                  : !partners.length
+                    ? 'Add an accountability partner (or wait for them to accept) to use this.'
+                    : !due
+                      ? 'Set a savings plan on this goal first. Save Me covers a contribution you can’t make.'
+                      : `Your partner can choose to cover your ${ghs(due, 0)} contribution. It’s support, not a loan.`
               }
               meta="Uses 1 Save Me if they help"
             />
@@ -373,10 +379,23 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
           )}
 
           <div className="mt-5">
-            <Field label="How much do you need?" prefix="GHS" placeholder="0.00" inputMode="decimal" value={amount} onChange={(e) => setAmount(cleanAmount(e.target.value))} />
+            <Field
+              label="How much do you need?"
+              prefix="GHS"
+              placeholder="0.00"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(cleanAmount(e.target.value))}
+              error={overDue}
+              hint={
+                overDue
+                  ? `Can't be more than your ${ghs(due, 0)} contribution`
+                  : `Up to your next contribution of ${ghs(due, 0)}${goal.nextContribution ? `, due ${shortDate(goal.nextContribution.due)}` : ''}`
+              }
+            />
           </div>
           <div className="mt-6">
-            <PrimaryButton disabled={!who || amt <= 0} onClick={() => setStage('waiting')}>
+            <PrimaryButton disabled={!who || amt <= 0 || overDue} onClick={() => setStage('waiting')}>
               Send request{who ? ` to ${askLabel}` : ''}
             </PrimaryButton>
           </div>
