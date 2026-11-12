@@ -22,7 +22,6 @@ import {
 
   GOAL_TYPE_LABEL,
   INTEREST_EARNED,
-  WISE_BADGES,
   circleProgress,
   ghs,
   shortDate,
@@ -34,9 +33,10 @@ import {
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
 import { MoneySheet } from '../components/ada'
-import { goalStore, noticeStore, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from "../lib/goalStore"
+import { AdaTabBar, TAB_BAR_SPACE } from './AdaTabs'
+import { goalStore, noticeStore, useBadges, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from "../lib/goalStore"
 
-const ADA_DARK = '#0F3D3E'
+const ADA_DARK = '#12212F'
 
 type Icon = ComponentType<{ size?: number }>
 /** Max items per list on the Adawise home; the arrows open the full lists */
@@ -50,7 +50,7 @@ function CloseIcon() {
   )
 }
 
-/** Adawise home inside MoMo: wallet → quick actions → highlights → contributions → goals → circles */
+/** Adawise home tab: wallet → quick actions → requests → highlights → contributions → goals you support */
 export function Adawise() {
   useThemeColor(ADA_DARK)
   const navigate = useNavigate()
@@ -60,6 +60,7 @@ export function Adawise() {
   const goals = useGoals()
   const circles = useCircles()
   const saveMe = useSaveMe()
+  const badges = useBadges()
   const unread = useUnreadCount()
   const pending = useRequests().filter((r) => r.status === 'pending')
   const supporting = useSupporting()
@@ -70,8 +71,8 @@ export function Adawise() {
 
   return (
     <div className="font-ada relative flex h-full flex-col bg-[#f4f6f7]">
-      <main className="min-h-0 flex-1 overflow-y-auto pb-[calc(32px+env(safe-area-inset-bottom))]">
-        {/* ---- Header + wallet, laid out like the MoMo home but in Adawise teal ---- */}
+      <main className={`min-h-0 flex-1 overflow-y-auto ${TAB_BAR_SPACE}`}>
+        {/* ---- Header + wallet, laid out like the MoMo home but in Adawise navy ---- */}
         <section className="relative">
           <div
             className="ada-card-gradient absolute inset-x-0 top-0 h-[calc(232px+env(safe-area-inset-top))]"
@@ -128,7 +129,7 @@ export function Adawise() {
               </div>
               <div className="border-l-[1.5px] border-ada/50 text-center">
                 <p className="text-[12.5px] text-muted">Available</p>
-                <p className="mt-[2px] text-[16px] font-bold text-ada">{money(available)}</p>
+                <p className="mt-[2px] text-[16px] font-bold text-ada-dark">{money(available)}</p>
               </div>
             </div>
           </div>
@@ -166,7 +167,7 @@ export function Adawise() {
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-2">
-                {pending.length > 0 && <span className="rounded-full bg-ada-soft px-2 py-[2px] text-[12px] font-semibold text-ada">{pending.length} new</span>}
+                {pending.length > 0 && <span className="rounded-full bg-ada-soft px-2 py-[2px] text-[12px] font-semibold text-ada-dark">{pending.length} new</span>}
                 <span className="text-dot">
                   <ChevronRight size={18} />
                 </span>
@@ -182,7 +183,7 @@ export function Adawise() {
             label="Save Me left"
             value={`${saveMe.left} of ${saveMe.allowed}`}
             note="Resets 1 Jan"
-            tone="from-[#0f3d3e] to-[#14b39f]"
+            tone="from-[#12212f] to-[#2a4a63]"
           />
           <Highlight
             icon={VaultIcon}
@@ -190,10 +191,10 @@ export function Adawise() {
             label="Fixed deposits"
             value={hidden ? 'GHS ****' : ghs(FIXED_DEPOSITS, 0)}
             note={`Interest earned ${ghs(INTEREST_EARNED, 0)}`}
-            tone="from-[#082426] to-[#0f5a55]"
+            tone="from-[#0c1722] to-[#1f3a50]"
           />
-          <Highlight icon={BadgeIcon} image="badges" label="WiseBadges" value={String(WISE_BADGES)} note="Stay steady" tone="from-[#0f3d3e] to-[#2bbfa9]" />
-          <Highlight icon={UsersIcon} image="circles" label="Active circles" value={String(circles.length)} note="Growing" tone="from-[#0b2f31] to-[#1a7f72]" />
+          <Highlight icon={BadgeIcon} image="badges" label="WiseBadges" value={`${badges.filter((b) => b.earned).length} of ${badges.length}`} note="Milestones & partner badges" tone="from-[#12212f] to-[#33566f]" onClick={() => navigate('/adawise/badges')} />
+          <Highlight icon={UsersIcon} image="circles" label="Active circles" value={String(circles.length)} note="Growing" tone="from-[#12212f] to-[#264257]" />
         </section>
 
         {/* ---- Next contributions ---- */}
@@ -205,23 +206,6 @@ export function Adawise() {
             .map((g) => (
               <ContributionRow key={g.id} goal={g} money={money} onPay={() => setPaying(g)} />
             ))}
-        </section>
-
-        {/* ---- My goals ---- */}
-        <SectionHeader title="My goals" onMore={() => navigate('/adawise/goals')} />
-        <section className="flex flex-col gap-3 px-4">
-          {goals.slice(0, HOME_LIMIT).map((g) => (
-            <GoalCard key={g.id} goal={g} money={money} onClick={() => navigate(`/adawise/goal/${g.id}`)} />
-          ))}
-
-        </section>
-
-        {/* ---- My circles ---- */}
-        <SectionHeader title="My circles" onMore={() => navigate('/adawise/circles')} />
-        <section className="flex flex-col gap-3 px-4">
-          {circles.slice(0, HOME_LIMIT).map((c) => (
-            <CircleCard key={c.id} circle={c} onClick={() => navigate(`/adawise/circle/${c.id}`)} />
-          ))}
         </section>
 
         {/* ---- Goals you support (you're their accountability partner) ---- */}
@@ -257,6 +241,7 @@ export function Adawise() {
           setPaying(null)
         }}
       />
+      <AdaTabBar />
       {toastNode}
     </div>
   )
@@ -296,6 +281,7 @@ function Highlight({
   value,
   note,
   tone,
+  onClick,
 }: {
   icon: Icon
   image: string
@@ -303,10 +289,15 @@ function Highlight({
   value: string
   note: string
   tone: string
+  onClick?: () => void
 }) {
   const [photo, setPhoto] = useState(false)
+  const Box = onClick ? 'button' : 'div'
   return (
-    <div className={`relative w-[62%] shrink-0 snap-start narrow:w-[80%] overflow-hidden rounded-[18px] bg-gradient-to-br ${tone} p-4 text-white`}>
+    <Box
+      {...(onClick ? { type: 'button' as const, onClick } : {})}
+      className={`relative w-[62%] shrink-0 snap-start narrow:w-[80%] overflow-hidden rounded-[18px] bg-gradient-to-br ${tone} p-4 text-left text-white ${onClick ? 'active:scale-[0.98]' : ''}`}
+    >
       <img
         src={`/adawise/highlights/${image}.jpg`}
         alt=""
@@ -323,7 +314,7 @@ function Highlight({
       <p className="relative text-[14px] font-semibold text-white/90 [text-shadow:0_1px_4px_rgba(0,0,0,0.4)]">{label}</p>
       <p className="relative mt-1 whitespace-nowrap text-[clamp(22px,7.4vw,28px)] font-bold leading-tight [text-shadow:0_1px_6px_rgba(0,0,0,0.4)]">{value}</p>
       <p className="relative mt-1 text-[13px] text-white/85">{note}</p>
-    </div>
+    </Box>
   )
 }
 
@@ -394,7 +385,7 @@ export function GoalCard({ goal: g, money, onClick }: { goal: Goal; money: (n: n
         <span>
           <span className="font-semibold text-ink">{money(g.saved)}</span> / {ghs(g.target, 0)}
         </span>
-        <span className="font-semibold text-ada">{pct}%</span>
+        <span className="font-semibold text-ada-dark">{pct}%</span>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-[6px] text-[12.5px] text-muted">
         <span className="whitespace-nowrap">{unlock}</span>
@@ -489,7 +480,7 @@ export function SupportedCard({ goal: s, onCheer }: { goal: SupportedGoal; onChe
       <Progress value={pct} />
       <div className="flex justify-between text-[12.5px] text-muted">
         <span>{GOAL_TYPE_LABEL[s.type]} · {s.role === 'saver' ? 'Saving together' : 'You support'}</span>
-        <span className="font-semibold text-ada">{pct}%</span>
+        <span className="font-semibold text-ada-dark">{pct}%</span>
       </div>
     </div>
   )

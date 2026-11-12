@@ -1,6 +1,34 @@
 @import "tailwindcss";
 @import "@fontsource-variable/quicksand";
-@import "@fontsource-variable/inter";
+
+/* MTN Brighter Sans: Regular (400), Medium (500), Bold (700). Semibold (600) uses Bold. */
+@font-face {
+  font-family: "MTN Brighter Sans";
+  src:
+    url("/fonts/MTNBrighterSans-Regular.woff2") format("woff2"),
+    url("/fonts/MTNBrighterSans-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "MTN Brighter Sans";
+  src:
+    url("/fonts/MTNBrighterSans-Medium.woff2") format("woff2"),
+    url("/fonts/MTNBrighterSans-Medium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "MTN Brighter Sans";
+  src:
+    url("/fonts/MTNBrighterSans-Bold.woff2") format("woff2"),
+    url("/fonts/MTNBrighterSans-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* Small-device breakpoints: "narrow" = under 360px wide (iPhone SE 1st gen, small Androids), "short" = under 640px tall */
 @custom-variant narrow (@media (width < 360px));
@@ -8,9 +36,8 @@
 
 /* MoMo design tokens (eyeballed from screenshots — fine-tune with a colour picker) */
 @theme {
-  /* Stand-in for MTN Brighter Sans (proprietary): closest Google Font in a side-by-side test.
-     Put the real font first here once you have it. */
-  --font-sans: "Quicksand Variable", system-ui, sans-serif;
+  /* MTN Brighter Sans, with Quicksand as the fallback while it loads */
+  --font-sans: "MTN Brighter Sans", "Quicksand Variable", system-ui, sans-serif;
   --color-navy: #00547b;
   --color-navy-dark: #003a5c;
   --color-yellow: #ffcb05;
@@ -20,26 +47,22 @@
   --color-disabled: #b0b0b0;
   --color-surface: #f2f2f2;
 
-  /* Adawise accent, taken from the Adawise app (teal buttons, dark-teal wallet card) */
+  /* Adawise accent, taken from the Adawise app (teal buttons; headers and dark cards are #12212f) */
   --color-ada: #14b39f;
-  --color-ada-dark: #0b2f31;
+  --color-ada-dark: #12212f;
   --color-ada-soft: #e3f6f3;
 
-  /* Adawise app font (looks like Inter in the app screenshots; swap if the team uses another) */
-  --font-ada: "Inter Variable", system-ui, sans-serif;
+  /* Adawise uses the same MTN Brighter Sans as the MoMo screens */
+  --font-ada: "MTN Brighter Sans", "Quicksand Variable", system-ui, sans-serif;
 }
 
-/* Inter is sturdier than Quicksand, so undo the MoMo body tweaks inside Adawise */
 .font-ada {
   font-weight: 400;
-  letter-spacing: -0.005em;
 }
 
+/* Adawise headers and dark cards */
 .ada-card-gradient {
-  background:
-    radial-gradient(120% 80% at 100% 0%, rgba(20, 179, 159, 0.28) 0%, transparent 55%),
-    radial-gradient(90% 70% at 0% 100%, rgba(20, 179, 159, 0.18) 0%, transparent 60%),
-    linear-gradient(140deg, #0f3d3e 0%, #0b2f31 55%, #082426 100%);
+  background: #12212f;
 }
 
 html,
@@ -53,9 +76,7 @@ body {
   background: #ffffff;
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* Quicksand's 400 is thinner than MoMo's body text; 500 + a touch of tracking matches better */
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;

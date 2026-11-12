@@ -152,7 +152,6 @@ export const CIRCLES: Circle[] = [
 export const SAVE_ME = { used: 1, allowed: 3 }
 export const FIXED_DEPOSITS = 2000
 export const INTEREST_EARNED = 75
-export const WISE_BADGES = 4
 export const PARTNER_REQUESTS = 1
 export const MILESTONES = [3, 6, 9, 12]
 /** Demo terms for Save Me credit against a fixed deposit */
@@ -326,3 +325,94 @@ export const SAVE_ME_TERMS = [
   'You approve every payment through MoMo and your Save Me PIN.',
   'You can follow their progress, but you never own, control or withdraw their savings.',
 ]
+
+/* ---------- WiseBadges: the visible side of the incentives ---------- */
+// Saver badges = the 3/6/9/12-month savings milestones (savings go into a fixed deposit, interest paid upfront).
+// Partner badges = taking part as an accountability partner (partner incentives).
+
+export type BadgeIconName = 'milestone' | 'heart' | 'lifebuoy' | 'circle'
+export type Badge = {
+  id: string
+  group: 'saver' | 'partner'
+  name: string
+  /** How to earn it */
+  how: string
+  /** The incentive attached to it */
+  reward: string
+  icon: BadgeIconName
+  /** Milestone number shown on the medal (3, 6, 9, 12) */
+  label?: string
+  earned: boolean
+  /** ISO date it was earned, when known */
+  earnedOn?: string
+  progress: { now: number; of: number; unit: string }
+  /** Goals that reached this milestone, with the interest each was paid for it */
+  goals?: { id: string; name: string; interest: number }[]
+}
+
+const addMonths = (isoDate: string, m: number) => {
+  const d = new Date(isoDate + 'T00:00:00')
+  d.setMonth(d.getMonth() + m)
+  return d.toISOString().slice(0, 10)
+}
+
+export function computeBadges(input: { goals: Goal[]; circles: Circle[]; supporting: SupportedGoal[]; requests: PartnerRequest[] }): Badge[] {
+  const { goals, circles, supporting, requests } = input
+  const longest = Math.max(0, ...goals.map((g) => monthsSince(g.createdAt)))
+
+  const saver: Badge[] = MILESTONES.map((m) => {
+    const reached = goals.filter((g) => monthsSince(g.createdAt) >= m)
+    return {
+      id: `milestone-${m}`,
+      group: 'saver',
+      name: `${m}-month saver`,
+      how: `Keep a goal going for ${m} months.`,
+      reward: 'Qualifying savings move into a fixed deposit and you get the interest upfront.',
+      icon: 'milestone',
+      label: String(m),
+      earned: reached.length > 0,
+      earnedOn: reached.length ? reached.map((g) => addMonths(g.createdAt, m)).sort()[0] : undefined,
+      progress: { now: Math.min(longest, m), of: m, unit: 'months' },
+      goals: reached.map((g) => ({
+        id: g.id,
+        name: g.name,
+        interest: (g.activity ?? []).filter((a) => a.kind === 'interest' && a.note?.startsWith(`${m}-month`)).reduce((t, a) => t + a.amount, 0),
+      })),
+    }
+  })
+
+  const rescues = requests.filter((r) => r.kind === 'saveme' && r.status === 'approved').length
+  const partner: Badge[] = [
+    {
+      id: 'partner',
+      group: 'partner',
+      name: 'Accountability partner',
+      how: "Support someone's goal as their accountability partner.",
+      reward: 'Partner incentive',
+      icon: 'heart',
+      earned: supporting.length > 0,
+      progress: { now: Math.min(1, supporting.length), of: 1, unit: 'goal' },
+    },
+    {
+      id: 'circle-saver',
+      group: 'partner',
+      name: 'Circle saver',
+      how: 'Save together with others in a WiseCircle.',
+      reward: 'Partner incentive',
+      icon: 'circle',
+      earned: circles.length > 0,
+      progress: { now: Math.min(1, circles.length), of: 1, unit: 'circle' },
+    },
+    {
+      id: 'save-me-hero',
+      group: 'partner',
+      name: 'Save Me hero',
+      how: 'Help someone with a Save Me request.',
+      reward: 'Partner incentive',
+      icon: 'lifebuoy',
+      earned: rescues > 0,
+      progress: { now: Math.min(1, rescues), of: 1, unit: 'rescue' },
+    },
+  ]
+  return [...saver, ...partner]
+}

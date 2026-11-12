@@ -535,7 +535,7 @@ function Milestones({ goal }: { goal: Goal }) {
           'All milestones reached. Brilliant consistency!'
         )}
       </p>
-      {interest > 0 && <p className="mt-2 text-[13px] font-semibold text-ada">Interest paid upfront so far: {ghs(interest)}</p>}
+      {interest > 0 && <p className="mt-2 text-[13px] font-semibold text-ada-dark">Interest paid upfront so far: {ghs(interest)}</p>}
     </div>
   )
 }
@@ -561,7 +561,7 @@ function ActivityRow({ a }: { a: Activity }) {
           {a.note ? ` · ${a.note}` : ''}
         </p>
       </div>
-      <p className={`shrink-0 text-[14.5px] font-bold ${k.sign < 0 ? 'text-[#b93535]' : k.sign > 0 ? 'text-ada' : 'text-ink'}`}>
+      <p className={`shrink-0 text-[14.5px] font-bold ${k.sign < 0 ? 'text-[#b93535]' : k.sign > 0 ? 'text-ada-dark' : 'text-ink'}`}>
         {k.sign > 0 ? '+' : k.sign < 0 ? '−' : ''}
         {ghs(a.amount)}
       </p>

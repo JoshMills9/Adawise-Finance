@@ -14,7 +14,9 @@ import { NewCircle } from './screens/NewCircle'
 import { CircleDetail } from './screens/CircleDetail'
 import { RequestDetail, RequestsList } from './screens/Requests'
 import { Notifications } from './screens/Notifications'
-import { CirclesList, ContributionsList, GoalsList, SupportingList } from './screens/Lists'
+import { ContributionsList, SupportingList } from './screens/Lists'
+import { CirclesTab, GoalsTab, ProfileTab, isAdaTab } from './screens/AdaTabs'
+import { Badges } from './screens/Badges'
 
 export function App() {
   const location = useLocation()
@@ -24,7 +26,8 @@ export function App() {
     <div className="fixed inset-y-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 overflow-hidden bg-white shadow-[0_0_40px_rgba(0,0,0,0.12)]">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
-          key={location.pathname}
+          // Switching between Adawise tabs swaps in place; everything else slides
+          key={isAdaTab(location.pathname) ? 'adawise-tabs' : location.pathname}
           className="absolute inset-0"
           initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
@@ -47,8 +50,10 @@ export function App() {
             <Route path="/adawise/requests" element={<RequestsList />} />
             <Route path="/adawise/requests/:id" element={<RequestDetail />} />
             <Route path="/adawise/notifications" element={<Notifications />} />
-            <Route path="/adawise/goals" element={<GoalsList />} />
-            <Route path="/adawise/circles" element={<CirclesList />} />
+            <Route path="/adawise/goals" element={<GoalsTab />} />
+            <Route path="/adawise/circles" element={<CirclesTab />} />
+            <Route path="/adawise/profile" element={<ProfileTab />} />
+            <Route path="/adawise/badges" element={<Badges />} />
             <Route path="/adawise/contributions" element={<ContributionsList />} />
             <Route path="/adawise/supporting" element={<SupportingList />} />
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,7 @@
 // Demo stores: seeded with dummy data, remember what's created or changed in the demo.
 import { useSyncExternalStore } from 'react'
 import {
+  computeBadges,
   CIRCLES,
   GOALS,
   NOTICES,
@@ -194,3 +195,12 @@ export function resetAdawise() {
   partnerProfile.reset()
 }
 
+
+/** WiseBadges, worked out live from goals, circles and partner activity */
+export function useBadges() {
+  const goals = useGoals()
+  const circles = useCircles()
+  const supporting = useSupporting()
+  const requests = useRequests()
+  return computeBadges({ goals, circles, supporting, requests })
+}

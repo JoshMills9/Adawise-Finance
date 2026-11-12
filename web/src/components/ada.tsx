@@ -1,4 +1,4 @@
-// Shared building blocks for the Adawise screens (Adawise colours + Inter font).
+// Shared building blocks for the Adawise screens (Adawise colours + MTN Brighter Sans).
 import { useEffect, useRef, useState, type ComponentType, type InputHTMLAttributes, type ReactNode } from 'react'
 import { AnimatePresence, motion } from "motion/react"
 import type { NavigateFunction } from "react-router-dom"
@@ -7,8 +7,9 @@ import { PERIODS, amountOf, cleanAmount } from '../lib/format'
 import { BulbIcon, CheckMark } from './goalIcons'
 
 export type Icon = ComponentType<{ size?: number }>
-export const ADA_DARK = '#0F3D3E'
+export const ADA_DARK = '#12212F'
 export const DEMO_WALLET = '241 234 567'
+export const DEMO_NAME = 'Ama Mensah'
 export const card = 'rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]'
 
 /* ---------- layout ---------- */
@@ -26,7 +27,7 @@ export function IconButton({ label, onClick, children }: { label: string; onClic
 export const BackPath = () => <path d="M15 4 7 12l8 8" />
 export const ClosePath = () => <path d="M5 5l14 14M19 5 5 19" />
 
-/** Teal header with a curved bottom, used on detail screens */
+/** Dark navy header with a curved bottom, used on detail screens */
 export function DetailHeader({ title, onBack, right, children }: { title: string; onBack: () => void; right?: ReactNode; children?: ReactNode }) {
   return (
     <header
@@ -289,7 +290,7 @@ export function Progress({ value, className = 'my-[10px]' }: { value: number; cl
   )
 }
 
-/** Circular progress ring for the teal headers */
+/** Circular progress ring for the dark headers */
 export function Ring({ value, size = 156, stroke = 12, children }: { value: number; size?: number; stroke?: number; children: ReactNode }) {
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
@@ -328,7 +329,7 @@ export function Avatar({ initials, size = 30, ring, dark }: { initials: string; 
 }
 
 export function Tag({ children, tone = 'grey' }: { children: ReactNode; tone?: 'grey' | 'teal' | 'amber' }) {
-  const tones = { grey: 'bg-[#eef2f4] text-muted', teal: 'bg-ada-soft text-ada', amber: 'bg-[#fff4d6] text-[#8a6300]' }
+  const tones = { grey: 'bg-[#eef2f4] text-muted', teal: 'bg-ada-soft text-ada-dark', amber: 'bg-[#fff4d6] text-[#8a6300]' }
   return <span className={`shrink-0 rounded-full px-2 py-[2px] text-[11.5px] font-semibold ${tones[tone]}`}>{children}</span>
 }
 
