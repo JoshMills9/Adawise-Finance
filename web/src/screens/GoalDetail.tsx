@@ -27,6 +27,7 @@ import {
 import {
   CONTACTS,
   CREDIT,
+  creditLeft,
   GOAL_TYPE_LABEL,
   MAX_PARTNERS,
   MILESTONES,
@@ -125,8 +126,15 @@ export function GoalDetail() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-bold text-ink">Save Me credit · {ghs(goal.credit.amount)}</p>
-                <p className="text-[13px] text-muted">Repay {ghs(goal.credit.amount * (1 + CREDIT.feeRate))} by {longDate(goal.credit.due)}</p>
+                <p className="text-[13px] text-muted">{ghs(creditLeft(goal.credit))} left to repay by {longDate(goal.credit.due)}</p>
               </div>
+              <button
+                type="button"
+                onClick={() => navigate('/adawise/credit')}
+                className="h-[34px] shrink-0 rounded-full bg-ada px-[14px] text-[13px] font-bold text-white active:brightness-110"
+              >
+                Repay
+              </button>
             </div>
           )}
 
@@ -474,7 +482,7 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
       {stage === 'crediting' && (
         <CreditProcessing
           onDone={() => {
-            goalStore.update(goal.id, (g) => ({ ...g, credit: { amount: cAmt, due: iso(addMonths(CREDIT.months)) } }))
+            goalStore.update(goal.id, (g) => ({ ...g, credit: { amount: cAmt, due: iso(addMonths(CREDIT.months)), repaid: 0, takenOn: iso(new Date()) } }))
             goalStore.record(goal.id, 'credit', cAmt, 0, 'Credit against fixed deposit')
             walletStore.addCredit(cAmt, goal.id, `Save Me credit · ${goal.name}`)
             onToast(`${ghs(cAmt)} credit added to your available balance`)
@@ -555,6 +563,7 @@ const KIND: Record<Activity['kind'], { label: string; sign: 1 | -1 | 0; icon: Re
   rescue: { label: 'Save Me rescue', sign: 1, icon: <HeartIcon size={18} /> },
   interest: { label: 'Milestone interest', sign: 1, icon: <VaultIcon size={18} /> },
   credit: { label: 'Credit to Adawise wallet', sign: 0, icon: <UsersIcon size={18} /> },
+  repayment: { label: 'Credit repayment', sign: 0, icon: <VaultIcon size={18} /> },
 }
 
 function ActivityRow({ a }: { a: Activity }) {

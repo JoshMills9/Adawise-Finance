@@ -6,7 +6,7 @@ export type Frequency = 'daily' | 'weekly' | 'monthly'
 export type Partner = { name: string; initials: string; role: 'saver' | 'supporter'; status?: 'invited' | 'active' }
 export const MAX_PARTNERS = 2
 
-export type ActivityKind = 'deposit' | 'auto-save' | 'withdrawal' | 'rescue' | 'interest' | 'credit'
+export type ActivityKind = 'deposit' | 'auto-save' | 'withdrawal' | 'rescue' | 'interest' | 'credit' | 'repayment'
 export type Activity = { id: string; kind: ActivityKind; amount: number; date: string; note?: string }
 
 export type Goal = {
@@ -26,7 +26,7 @@ export type Goal = {
   icon?: string
   activity?: Activity[]
   /** Active Save Me credit taken against this goal's fixed deposit */
-  credit?: { amount: number; due: string }
+  credit?: { amount: number; due: string; repaid?: number; takenOn?: string }
 }
 
 export type CircleMember = { name: string; initials: string; saved: number; status: 'active' | 'invited'; you?: boolean }
@@ -156,6 +156,9 @@ export const PARTNER_REQUESTS = 1
 export const MILESTONES = [3, 6, 9, 12]
 /** Demo terms for Save Me credit against a fixed deposit */
 export const CREDIT = { maxShare: 0.8, months: 3, feeRate: 0.06 }
+/** What a Save Me credit costs in total (amount + fee), and what's still left to pay */
+export const creditOwed = (c: NonNullable<Goal['credit']>) => Math.round(c.amount * (1 + CREDIT.feeRate) * 100) / 100
+export const creditLeft = (c: NonNullable<Goal['credit']>) => Math.max(0, Math.round((creditOwed(c) - (c.repaid ?? 0)) * 100) / 100)
 
 export const GOAL_TYPE_LABEL: Record<GoalType, string> = {
   flexible: 'Flexible',

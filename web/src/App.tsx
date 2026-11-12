@@ -17,6 +17,7 @@ import { Notifications } from './screens/Notifications'
 import { ContributionsList, SupportingList } from './screens/Lists'
 import { CirclesTab, GoalsTab, ProfileTab, isAdaTab } from './screens/AdaTabs'
 import { Badges } from './screens/Badges'
+import { Credit } from './screens/Credit'
 import { AdawiseTerms, AdawiseWelcome } from './screens/AdawiseIntro'
 
 export function App() {
@@ -57,6 +58,7 @@ export function App() {
             <Route path="/adawise/circles" element={<CirclesTab />} />
             <Route path="/adawise/profile" element={<ProfileTab />} />
             <Route path="/adawise/badges" element={<Badges />} />
+            <Route path="/adawise/credit" element={<Credit />} />
             <Route path="/adawise/contributions" element={<ContributionsList />} />
             <Route path="/adawise/supporting" element={<SupportingList />} />
             <Route path="*" element={<Navigate to="/" replace />} />

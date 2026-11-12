@@ -3,7 +3,7 @@ import { useState, type ComponentType, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ADA_DARK, Chip, DEMO_NAME, DEMO_WALLET } from '../components/ada'
 import { ChevronRight, FlagIcon, HomeIcon, PlusIcon, ProfileIcon, SearchIcon, UsersIcon } from '../components/icons'
-import { GOAL_TYPE_LABEL, SHOW_PARTNER_SIDE, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
+import { GOAL_TYPE_LABEL, SHOW_PARTNER_SIDE, creditLeft, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
 import { useBadges, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CircleCard, GoalCard } from './Adawise'
@@ -250,6 +250,7 @@ export function ProfileTab() {
   const unread = useUnreadCount()
   const pending = useRequests().filter((r) => r.status === 'pending').length
   const badges = useBadges()
+  const owed = goals.reduce((t, g) => t + (g.credit ? creditLeft(g.credit) : 0), 0)
   const earnedBadges = badges.filter((b) => b.earned).length
   const { total } = totals(goals)
   const initials = DEMO_NAME.split(' ')
@@ -282,6 +283,7 @@ export function ProfileTab() {
             <Row label="Goals you support" note={`${supporting.length}`} onClick={() => navigate('/adawise/supporting')} />
           </>
         )}
+        <Row label="Save Me credit" note={owed > 0 ? `${ghs(owed, 0)} to repay` : 'Nothing owed'} onClick={() => navigate('/adawise/credit')} />
         <Row label="Next contributions" onClick={() => navigate('/adawise/contributions')} />
         <Row label="Notifications" note={unread ? `${unread} unread` : undefined} onClick={() => navigate('/adawise/notifications')} />
       </section>

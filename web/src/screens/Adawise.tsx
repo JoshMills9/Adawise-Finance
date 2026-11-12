@@ -734,6 +734,7 @@ const GOAL_ACTIVITY: Partial<Record<Activity['kind'], { title: string; sign: 1 |
   withdrawal: { title: 'Withdrawal', sign: -1, icon: <CashOutIcon size={18} /> },
   rescue: { title: 'Save Me rescue', sign: 1, icon: <HeartIcon size={18} /> },
   interest: { title: 'Milestone interest', sign: 1, icon: <VaultIcon size={18} /> },
+  repayment: { title: 'Credit repayment', sign: -1, icon: <VaultIcon size={18} /> },
   // 'credit' is shown once, from the wallet side
 }
 
@@ -745,7 +746,8 @@ function recentActivity(goals: Goal[], walletActivity: WalletEntry[]): FeedItem[
       return k ? [{ id: `${g.id}-${a.id}`, date: a.date, title: k.title, sub: g.name, amount: a.amount, sign: k.sign, icon: k.icon, goalId: g.id }] : []
     }),
   )
-  const fromWallet: FeedItem[] = walletActivity.map((w) =>
+  // Repayments are listed once, from the goal side
+  const fromWallet: FeedItem[] = walletActivity.filter((w) => w.kind !== 'repayment').map((w) =>
     w.kind === 'credit'
       ? { id: w.id, date: w.date, title: 'Save Me credit', sub: `${goals.find((g) => g.id === w.goalId)?.name ?? 'Adawise wallet'} · to Available`, amount: w.amount, sign: 1, icon: <WalletIcon size={18} />, goalId: w.goalId }
       : { id: w.id, date: w.date, title: 'Withdrawal', sub: 'Credit balance · to MoMo', amount: w.amount, sign: -1, icon: <CashOutIcon size={18} /> },

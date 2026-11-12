@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 import {
   computeBadges,
   CIRCLES,
+  creditLeft,
   GOALS,
   NOTICES,
   REQUESTS,
@@ -94,6 +95,23 @@ export const goalStore = {
     else next.setDate(next.getDate() + (f === 'daily' ? 1 : 7))
     goalStore.update(id, (x) => ({ ...x, nextContribution: { amount, due: iso(next) } }))
   },
+  /** Pays part or all of a goal's Save Me credit. Returns true once it's fully repaid. */
+  repayCredit(id: string, amount: number, from: 'momo' | 'wallet'): boolean {
+    const g = goals.get().find((x) => x.id === id)
+    if (!g?.credit) return false
+    const repaid = Math.round(((g.credit.repaid ?? 0) + amount) * 100) / 100
+    const cleared = creditLeft({ ...g.credit, repaid }) <= 0
+    goalStore.update(id, (x) => ({
+      ...x,
+      credit: cleared ? undefined : { ...x.credit!, repaid },
+      activity: [
+        { id: uid('a'), kind: 'repayment', amount, date: todayIso(), note: cleared ? 'Credit fully repaid' : from === 'wallet' ? 'From credit balance' : 'From MoMo wallet' },
+        ...(x.activity ?? []),
+      ],
+    }))
+    if (from === 'wallet') walletStore.spendOnRepayment(amount, id, `Credit repayment · ${g.name}`)
+    return cleared
+  },
   reset: goals.reset,
 }
 export const useGoals = () => goals.useValue()
@@ -101,7 +119,7 @@ export const useGoal = (id: string | undefined) => useGoals().find((g) => g.id =
 
 /* ---------- Adawise wallet (cash that isn't in a goal, e.g. Save Me credit) ---------- */
 
-export type WalletEntry = { id: string; kind: 'credit' | 'withdrawal'; amount: number; date: string; note?: string; goalId?: string }
+export type WalletEntry = { id: string; kind: 'credit' | 'withdrawal' | 'repayment'; amount: number; date: string; note?: string; goalId?: string }
 const wallet = createStore<{ balance: number; activity: WalletEntry[] }>('adawise.wallet.v1', { balance: 0, activity: [] })
 
 export const walletStore = {
@@ -114,6 +132,11 @@ export const walletStore = {
   withdraw(amount: number) {
     const w = wallet.get()
     wallet.set({ balance: Math.max(0, w.balance - amount), activity: [{ id: uid('w'), kind: 'withdrawal', amount, date: todayIso(), note: 'To MoMo wallet' }, ...w.activity] })
+  },
+  /** Pays a credit back from the credit balance still sitting in the wallet */
+  spendOnRepayment(amount: number, goalId: string, note: string) {
+    const w = wallet.get()
+    wallet.set({ balance: Math.max(0, w.balance - amount), activity: [{ id: uid('w'), kind: 'repayment', amount, date: todayIso(), note, goalId }, ...w.activity] })
   },
   reset: wallet.reset,
 }
