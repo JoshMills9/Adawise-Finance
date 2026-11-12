@@ -36,7 +36,7 @@ export function ContributionsList() {
     <ListShell title="Next contributions" subtitle={`${list.length} upcoming · ${ghs(due)} in total`}>
       <div className={`${card} divide-y divide-[#eef0f1] overflow-hidden`}>
         {list.map((g) => (
-          <ContributionRow key={g.id} goal={g} money={money} onPay={() => navigate(`/adawise/goal/${g.id}?action=add`)} />
+          <ContributionRow key={g.id} goal={g} money={money} onOpen={() => navigate(`/adawise/goal/${g.id}`)} onPay={() => navigate(`/adawise/goal/${g.id}?action=add`)} />
         ))}
         {list.length === 0 && <p className="px-4 py-8 text-center text-[14px] text-muted">Nothing due. Nice work!</p>}
       </div>

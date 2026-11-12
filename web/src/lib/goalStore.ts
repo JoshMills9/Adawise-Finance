@@ -99,6 +99,26 @@ export const goalStore = {
 export const useGoals = () => goals.useValue()
 export const useGoal = (id: string | undefined) => useGoals().find((g) => g.id === id)
 
+/* ---------- Adawise wallet (cash that isn't in a goal, e.g. Save Me credit) ---------- */
+
+export type WalletEntry = { id: string; kind: 'credit' | 'withdrawal'; amount: number; date: string; note?: string; goalId?: string }
+const wallet = createStore<{ balance: number; activity: WalletEntry[] }>('adawise.wallet.v1', { balance: 0, activity: [] })
+
+export const walletStore = {
+  /** Save Me credit granted against a goal's fixed deposit lands here */
+  addCredit(amount: number, goalId: string, note: string) {
+    const w = wallet.get()
+    wallet.set({ balance: w.balance + amount, activity: [{ id: uid('w'), kind: 'credit', amount, date: todayIso(), note, goalId }, ...w.activity] })
+  },
+  /** Cash out to the MoMo wallet */
+  withdraw(amount: number) {
+    const w = wallet.get()
+    wallet.set({ balance: Math.max(0, w.balance - amount), activity: [{ id: uid('w'), kind: 'withdrawal', amount, date: todayIso(), note: 'To MoMo wallet' }, ...w.activity] })
+  },
+  reset: wallet.reset,
+}
+export const useWallet = () => wallet.useValue()
+
 /* ---------- circles ---------- */
 
 const circles = createStore<Circle[]>('adawise.circles.v2', CIRCLES)
@@ -190,6 +210,7 @@ export const useHasSaveMePin = () => profile.useValue().pinPrint !== null
 /** Clears everything created during a demo (used by ?reset) */
 export function resetAdawise() {
   goalStore.reset()
+  walletStore.reset()
   circleStore.reset()
   saveMeStore.reset()
   noticeStore.reset()

@@ -4,6 +4,7 @@ import { useToast } from '../components/ui'
 import {
   BadgeIcon,
   BellIcon,
+  CashOutIcon,
   ChevronRight,
   ClockIcon,
   DropletIcon,
@@ -29,27 +30,30 @@ import {
   totals,
   type Circle,
   type Goal,
+  type Activity,
   type SupportedGoal,
+  withdrawRule,
 } from '../lib/demoData'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
-import { MoneySheet } from '../components/ada'
+import { HeartIcon, MoneySheet, Radio, Sheet, PrimaryButton } from '../components/ada'
 import { AdaTabBar, TAB_BAR_SPACE } from './AdaTabs'
-import { goalStore, noticeStore, useBadges, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from "../lib/goalStore"
+import { goalStore, noticeStore, useBadges, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount, useWallet, walletStore, type WalletEntry } from "../lib/goalStore"
 
 const ADA_DARK = '#12212F'
 
 type Icon = ComponentType<{ size?: number }>
 /** Max items per list on the Adawise home; the arrows open the full lists */
 const HOME_LIMIT = 3
+/** The swipeable highlight cards (Save Me left, fixed deposits, WiseBadges, circles) */
+const SHOW_HIGHLIGHTS = false
 
-/** Adawise home tab: wallet → quick actions → requests → highlights → contributions → goals you support */
+/** Adawise home tab: wallet card (Save / Withdraw) → quick actions → recent activity */
 export function Adawise() {
   useThemeColor(ADA_DARK)
   const navigate = useNavigate()
   const [toast, toastNode] = useToast()
   const [hidden, setHidden] = useState(false)
-  const [paying, setPaying] = useState<Goal | null>(null)
   const goals = useGoals()
   const circles = useCircles()
   const saveMe = useSaveMe()
@@ -59,8 +63,20 @@ export function Adawise() {
   const supporting = useSupporting()
   const pendingInvites = pending.filter((r) => r.kind === 'invite').length
   const pendingSaveMe = pending.filter((r) => r.kind === 'saveme').length
-  const { total, locked, available } = totals(goals)
+  const wallet = useWallet()
+  const [withdrawing, setWithdrawing] = useState(false)
+  const [source, setSource] = useState<WithdrawSource | null>(null)
+  const [showAllActivity, setShowAllActivity] = useState(false)
+  const { total: saved, locked, available: flexible } = totals(goals)
+  // Credit granted against a fixed deposit sits in the Adawise wallet and counts as available
+  const available = flexible + wallet.balance
+  const total = saved
+  const canWithdraw = wallet.balance > 0 || goals.some((g) => g.saved > 0 && withdrawRule(g).allowed)
+  const [saving, setSaving] = useState(false)
+  const [saveTo, setSaveTo] = useState<Goal | null>(null)
   const money = (n: number) => (hidden ? 'GHS ****' : ghs(n))
+  const activity = recentActivity(goals, wallet.activity)
+  const shownActivity = showAllActivity ? activity : activity.slice(0, ACTIVITY_LIMIT)
 
   return (
     <div className="font-ada relative flex h-full flex-col bg-[#f4f6f7]">
@@ -95,30 +111,51 @@ export function Adawise() {
           {/* Wallet card (white, like the MoMo wallet) */}
           <div className="relative mx-4 mt-[22px] overflow-hidden rounded-[14px] bg-white shadow-[0_6px_20px_rgba(8,36,38,0.14)]">
             <span className="absolute left-0 top-0 flex items-center gap-1 rounded-br-[8px] bg-ada px-2 py-[3px] text-[11px] font-semibold text-white">
-              <WalletIcon size={12} /> Wallet
+              <WalletIcon size={12} /> My savings
             </span>
             <button
               type="button"
               aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
               onClick={() => setHidden((h) => !h)}
-              className="absolute right-[14px] top-[42px] text-ada-dark active:opacity-60"
+              className="absolute right-[14px] top-[44px] text-ada-dark active:opacity-60"
             >
               {hidden ? <EyeIcon size={28} /> : <EyeOffIcon size={28} />}
             </button>
 
-            <div className="px-4 pb-[14px] pt-[30px] text-center">
+            <div className="px-4 pb-[12px] pt-[32px] text-center">
               <p className="text-[13px] text-muted">Total savings</p>
               <p className="mt-[2px] text-[27px] font-bold text-ada-dark">{money(total)}</p>
             </div>
-            <div className="grid grid-cols-2 border-t border-[#e6e6e6] py-[12px]">
+            <div className="grid grid-cols-2 pb-[14px]">
               <div className="text-center">
                 <p className="text-[12.5px] text-muted">Locked</p>
                 <p className="mt-[2px] text-[16px] font-bold text-ada-dark">{money(locked)}</p>
               </div>
-              <div className="border-l-[1.5px] border-ada/50 text-center">
+              <div className="border-l border-[#e6e6e6] text-center">
                 <p className="text-[12.5px] text-muted">Available</p>
                 <p className="mt-[2px] text-[16px] font-bold text-ada-dark">{money(available)}</p>
+                {wallet.balance > 0 && <p className="text-[11px] leading-tight text-muted">incl. {hidden ? 'GHS ****' : ghs(wallet.balance, 0)} credit</p>}
               </div>
+            </div>
+            {/* Action row, like the MoMo wallet card (one line tall) */}
+            <div className="grid grid-cols-2 border-t border-[#e6e6e6]">
+              <button
+                type="button"
+                onClick={() => setSaving(true)}
+                className="flex items-center justify-center gap-2 py-[18px] text-ada active:bg-[#f7f9f9]"
+              >
+                <PlusIcon size={22} />
+                <span className="text-[14px] font-semibold">Save</span>
+              </button>
+              <button
+                type="button"
+                disabled={!canWithdraw}
+                onClick={() => setWithdrawing(true)}
+                className="flex items-center justify-center gap-2 border-l border-[#e6e6e6] py-[18px] text-ada active:bg-[#f7f9f9] disabled:text-[#a3adae] disabled:active:bg-transparent"
+              >
+                <CashOutIcon size={22} />
+                <span className="text-[14px] font-semibold">Withdraw</span>
+              </button>
             </div>
           </div>
         </section>
@@ -165,7 +202,8 @@ export function Adawise() {
         </section>
         )}
 
-        {/* ---- Highlights (swipe) ---- */}
+        {/* ---- Highlights (swipe) — hidden for now; set SHOW_HIGHLIGHTS to true to bring back ---- */}
+        {SHOW_HIGHLIGHTS && (
         <section className="mt-5 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
           <Highlight
             icon={LifebuoyIcon}
@@ -186,16 +224,32 @@ export function Adawise() {
           <Highlight icon={BadgeIcon} image="badges" label="WiseBadges" value={`${badges.filter((b) => b.earned).length} of ${badges.length}`} note="3, 6, 9 & 12-month milestones" tone="from-[#12212f] to-[#33566f]" onClick={() => navigate('/adawise/badges')} />
           <Highlight icon={UsersIcon} image="circles" label="Active circles" value={String(circles.length)} note="Growing" tone="from-[#12212f] to-[#264257]" />
         </section>
+        )}
 
-        {/* ---- Next contributions ---- */}
-        <SectionHeader title="Next contributions" onMore={() => navigate('/adawise/contributions')} />
-        {/* Compact list: one row per upcoming payment */}
-        <section className="mx-4 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          {upcoming(goals)
-            .slice(0, 3)
-            .map((g) => (
-              <ContributionRow key={g.id} goal={g} money={money} onPay={() => setPaying(g)} />
+        {/* ---- Recent activity (all goals + Adawise wallet), expandable ---- */}
+        <div className="mt-6 flex items-center justify-between px-4 pb-3">
+          <h2 className="text-[19px] font-bold text-ink">Recent activity</h2>
+        </div>
+        <section className="mx-4 overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+          <div className="divide-y divide-[#eef0f1]">
+            {shownActivity.map((a) => (
+              <ActivityItem key={a.id} item={a} money={money} onOpen={a.goalId ? () => navigate(`/adawise/goal/${a.goalId}`) : undefined} />
             ))}
+            {activity.length === 0 && <p className="px-4 py-8 text-center text-[14px] text-muted">No activity yet.</p>}
+          </div>
+          {activity.length > ACTIVITY_LIMIT && (
+            <button
+              type="button"
+              aria-expanded={showAllActivity}
+              onClick={() => setShowAllActivity((v) => !v)}
+              className="flex w-full items-center justify-center gap-1 border-t border-[#eef0f1] py-3 text-[14px] font-semibold text-ada active:bg-[#f7f9f9]"
+            >
+              {showAllActivity ? 'Show less' : `Show all (${activity.length})`}
+              <span className={`transition-transform ${showAllActivity ? '-rotate-90' : 'rotate-90'}`}>
+                <ChevronRight size={16} />
+              </span>
+            </button>
+          )}
         </section>
 
         {/* ---- Goals you support (you're their accountability partner) ---- */}
@@ -217,18 +271,52 @@ export function Adawise() {
           </>
         )}
       </main>
-      {/* Pay a scheduled contribution right here: straight to payment approval */}
+      {/* Save: pick a goal, then pay from MoMo */}
+      <SaveGoalSheet
+        open={saving}
+        goals={goals}
+        onClose={() => setSaving(false)}
+        onPick={(g) => {
+          setSaving(false)
+          setSaveTo(g)
+        }}
+      />
       <MoneySheet
-        open={paying !== null}
+        open={saveTo !== null}
         mode="deposit"
-        title="Confirm payment"
-        to={paying?.name ?? ""}
-        fixedAmount={paying?.nextContribution?.amount}
-        onClose={() => setPaying(null)}
+        title="Save"
+        to={saveTo?.name ?? ''}
+        suggestions={[...new Set([saveTo?.plan?.amount ?? 50, 50, 100, 200])]}
+        onClose={() => setSaveTo(null)}
         onDone={(amt) => {
-          if (paying) goalStore.payContribution(paying.id)
-          toast(`${ghs(amt)} saved to ${paying?.name}`)
-          setPaying(null)
+          if (saveTo) goalStore.record(saveTo.id, 'deposit', amt, +amt)
+          toast(`${ghs(amt)} saved to ${saveTo?.name}`)
+          setSaveTo(null)
+        }}
+      />
+      {/* Withdraw: pick where the money comes from, then the usual withdraw flow */}
+      <WithdrawSourceSheet
+        open={withdrawing}
+        goals={goals}
+        walletBalance={wallet.balance}
+        onClose={() => setWithdrawing(false)}
+        onPick={(src) => {
+          setWithdrawing(false)
+          setSource(src)
+        }}
+      />
+      <MoneySheet
+        open={source !== null}
+        mode="withdraw"
+        title="Withdraw"
+        to={source?.kind === 'goal' ? source.goal.name : 'Credit balance'}
+        max={source ? sourceAmount(source) : undefined}
+        onClose={() => setSource(null)}
+        onDone={(amt) => {
+          if (source?.kind === 'goal') goalStore.record(source.goal.id, 'withdrawal', amt, -amt, 'To MoMo wallet')
+          else walletStore.withdraw(amt)
+          toast(`${ghs(amt)} sent to your MoMo wallet`)
+          setSource(null)
         }}
       />
       <AdaTabBar />
@@ -398,9 +486,11 @@ export function GoalCard({ goal: g, money, onClick }: { goal: Goal; money: (n: n
 export const upcoming = (goals: Goal[]) =>
   goals.filter((g) => g.nextContribution).sort((a, b) => a.nextContribution!.due.localeCompare(b.nextContribution!.due))
 
-export function ContributionRow({ goal: g, money, onPay }: { goal: Goal; money: (n: number) => string; onPay: () => void }) {
+export function ContributionRow({ goal: g, money, onPay, onOpen }: { goal: Goal; money: (n: number) => string; onPay: () => void; onOpen?: () => void }) {
   return (
     <div className="flex items-center gap-3 px-[14px] py-[12px]">
+      {/* Tapping the row opens the goal; Pay stays a separate button */}
+      <button type="button" onClick={onOpen} disabled={!onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left active:opacity-70">
       <span className="grid size-[40px] shrink-0 place-items-center rounded-[12px] bg-ada-soft text-ada">
         <Glyph name={g.icon} size={20} />
       </span>
@@ -413,6 +503,7 @@ export function ContributionRow({ goal: g, money, onPay }: { goal: Goal; money: 
         </p>
       </div>
       <p className="shrink-0 text-[15px] font-bold text-ink narrow:hidden">{money(g.nextContribution!.amount)}</p>
+      </button>
       <button type="button" onClick={onPay} className="h-[34px] shrink-0 rounded-full bg-ada px-[14px] text-[13px] font-bold text-white active:brightness-110">
         Pay
       </button>
@@ -473,5 +564,184 @@ export function SupportedCard({ goal: s, onCheer }: { goal: SupportedGoal; onChe
         <span className="font-semibold text-ada-dark">{pct}%</span>
       </div>
     </div>
+  )
+}
+
+/* ---------- withdraw ---------- */
+
+type WithdrawSource = { kind: 'wallet'; amount: number } | { kind: 'goal'; goal: Goal }
+const sourceAmount = (s: WithdrawSource) => (s.kind === 'goal' ? s.goal.saved : s.amount)
+
+/** Where to withdraw from: the credit balance, or any goal that's unlocked right now */
+function WithdrawSourceSheet({
+  open,
+  goals,
+  walletBalance,
+  onClose,
+  onPick,
+}: {
+  open: boolean
+  goals: Goal[]
+  walletBalance: number
+  onClose: () => void
+  onPick: (s: WithdrawSource) => void
+}) {
+  const [picked, setPicked] = useState<string>('')
+  const unlocked = goals.filter((g) => g.saved > 0 && withdrawRule(g).allowed)
+  const lockedCount = goals.filter((g) => g.saved > 0 && !withdrawRule(g).allowed).length
+  const options: { id: string; title: string; sub: string; amount: number; src: WithdrawSource }[] = [
+    ...(walletBalance > 0 ? [{ id: 'wallet', title: 'Credit balance', sub: 'Save Me credit in your Adawise wallet', amount: walletBalance, src: { kind: 'wallet', amount: walletBalance } as const }] : []),
+    ...unlocked.map((g) => ({ id: g.id, title: g.name, sub: withdrawRule(g).reason, amount: g.saved, src: { kind: 'goal', goal: g } as const })),
+  ]
+  const choice = options.find((o) => o.id === picked)
+
+  return (
+    <Sheet
+      open={open}
+      onClose={() => {
+        setPicked('')
+        onClose()
+      }}
+      label="Withdraw"
+    >
+      <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Withdraw to MoMo</h2>
+      <p className="mt-1 text-[14px] text-muted">Choose where the money comes from.</p>
+
+      {options.length ? (
+        <div className="mt-4 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] border border-[#e6ebec]">
+          {options.map((o) => (
+            <button key={o.id} type="button" onClick={() => setPicked(o.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-[#f7f9f9]">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-ada-dark">{o.title}</span>
+                <span className="block truncate text-[12.5px] text-muted">{o.sub}</span>
+              </span>
+              <span className="shrink-0 text-[14.5px] font-bold text-ink">{ghs(o.amount)}</span>
+              <Radio on={picked === o.id} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-6 rounded-[16px] bg-[#f4f6f7] px-4 py-6 text-center text-[14px] text-muted">Nothing to withdraw right now. Your goals are still locked.</p>
+      )}
+      {lockedCount > 0 && options.length > 0 && (
+        <p className="mt-3 text-[12.5px] text-muted">
+          {lockedCount} locked goal{lockedCount > 1 ? 's' : ''} can't be withdrawn until {lockedCount > 1 ? 'they unlock' : 'it unlocks'}.
+        </p>
+      )}
+
+      <div className="mt-5">
+        <PrimaryButton
+          disabled={!choice}
+          onClick={() => {
+            if (!choice) return
+            setPicked('')
+            onPick(choice.src)
+          }}
+        >
+          Continue
+        </PrimaryButton>
+      </div>
+    </Sheet>
+  )
+}
+
+/** Save: choose which goal the money goes to */
+function SaveGoalSheet({ open, goals, onClose, onPick }: { open: boolean; goals: Goal[]; onClose: () => void; onPick: (g: Goal) => void }) {
+  const [picked, setPicked] = useState('')
+  const choice = goals.find((g) => g.id === picked)
+  return (
+    <Sheet
+      open={open}
+      onClose={() => {
+        setPicked('')
+        onClose()
+      }}
+      label="Save"
+    >
+      <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Save to a goal</h2>
+      <p className="mt-1 text-[14px] text-muted">Choose where the money goes.</p>
+      {goals.length ? (
+        <div className="mt-4 max-h-[50vh] divide-y divide-[#eef0f1] overflow-y-auto rounded-[16px] border border-[#e6ebec]">
+          {goals.map((g) => (
+            <button key={g.id} type="button" onClick={() => setPicked(g.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-[#f7f9f9]">
+              <span className="grid size-[36px] shrink-0 place-items-center rounded-[10px] bg-ada-soft text-ada">
+                <Glyph name={g.icon} size={18} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold text-ada-dark">{g.name}</span>
+                <span className="block truncate text-[12.5px] text-muted">
+                  {ghs(g.saved, 0)} of {ghs(g.target, 0)} · {GOAL_TYPE_LABEL[g.type]}
+                </span>
+              </span>
+              <Radio on={picked === g.id} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-6 rounded-[16px] bg-[#f4f6f7] px-4 py-6 text-center text-[14px] text-muted">Create a goal first, then you can save to it.</p>
+      )}
+      <div className="mt-5">
+        <PrimaryButton
+          disabled={!choice}
+          onClick={() => {
+            if (!choice) return
+            setPicked('')
+            onPick(choice)
+          }}
+        >
+          Continue
+        </PrimaryButton>
+      </div>
+    </Sheet>
+  )
+}
+
+/* ---------- recent activity ---------- */
+
+const ACTIVITY_LIMIT = 5
+
+type FeedItem = { id: string; date: string; title: string; sub: string; amount: number; sign: 1 | -1; icon: ReactNode; goalId?: string }
+
+const GOAL_ACTIVITY: Partial<Record<Activity['kind'], { title: string; sign: 1 | -1; icon: ReactNode }>> = {
+  deposit: { title: 'Deposit', sign: 1, icon: <PlusIcon size={18} /> },
+  'auto-save': { title: 'Auto-save', sign: 1, icon: <ClockIcon size={18} /> },
+  withdrawal: { title: 'Withdrawal', sign: -1, icon: <CashOutIcon size={18} /> },
+  rescue: { title: 'Save Me rescue', sign: 1, icon: <HeartIcon size={18} /> },
+  interest: { title: 'Milestone interest', sign: 1, icon: <VaultIcon size={18} /> },
+  // 'credit' is shown once, from the wallet side
+}
+
+/** Every goal's activity plus the Adawise wallet's, newest first */
+function recentActivity(goals: Goal[], walletActivity: WalletEntry[]): FeedItem[] {
+  const fromGoals: FeedItem[] = goals.flatMap((g) =>
+    (g.activity ?? []).flatMap((a) => {
+      const k = GOAL_ACTIVITY[a.kind]
+      return k ? [{ id: `${g.id}-${a.id}`, date: a.date, title: k.title, sub: g.name, amount: a.amount, sign: k.sign, icon: k.icon, goalId: g.id }] : []
+    }),
+  )
+  const fromWallet: FeedItem[] = walletActivity.map((w) =>
+    w.kind === 'credit'
+      ? { id: w.id, date: w.date, title: 'Save Me credit', sub: `${goals.find((g) => g.id === w.goalId)?.name ?? 'Adawise wallet'} · to Available`, amount: w.amount, sign: 1, icon: <WalletIcon size={18} />, goalId: w.goalId }
+      : { id: w.id, date: w.date, title: 'Withdrawal', sub: 'Credit balance · to MoMo', amount: w.amount, sign: -1, icon: <CashOutIcon size={18} /> },
+  )
+  return [...fromWallet, ...fromGoals].sort((a, b) => b.date.localeCompare(a.date))
+}
+
+function ActivityItem({ item: a, money, onOpen }: { item: FeedItem; money: (n: number) => string; onOpen?: () => void }) {
+  const out = a.sign < 0
+  return (
+    <button type="button" onClick={onOpen} disabled={!onOpen} className="flex w-full items-center gap-3 px-[14px] py-[12px] text-left active:bg-[#f7f9f9] disabled:active:bg-transparent">
+      <span className={`grid size-[38px] shrink-0 place-items-center rounded-full ${out ? 'bg-[#fdefef] text-[#b93535]' : 'bg-ada-soft text-ada'}`}>{a.icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14.5px] font-semibold text-ada-dark">{a.title}</span>
+        <span className="block truncate text-[12.5px] text-muted">
+          {a.sub} · {shortDate(a.date)}
+        </span>
+      </span>
+      <span className={`shrink-0 text-[14.5px] font-bold ${out ? 'text-[#b93535]' : 'text-ada-dark'}`}>
+        {out ? '−' : '+'}
+        {money(a.amount)}
+      </span>
+    </button>
   )
 }

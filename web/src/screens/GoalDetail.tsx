@@ -38,7 +38,7 @@ import {
   type Goal,
 } from '../lib/demoData'
 import { addMonths, amountOf, cleanAmount, firstName, initials, iso, longDate, perLabel } from '../lib/format'
-import { goalStore, noticeStore, saveMeStore, useGoal, useSaveMe } from '../lib/goalStore'
+import { goalStore, noticeStore, saveMeStore, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CheckMark, Glyph } from '../components/goalIcons'
 
@@ -455,7 +455,7 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
             />
           </div>
           <div className="mt-4 divide-y divide-[#eef0f1] rounded-[14px] bg-[#f4f6f7] text-[14px]">
-            <SheetRow label="Paid to" value="Your MoMo wallet" />
+            <SheetRow label="Paid to" value="Your Adawise wallet (Available)" />
             <SheetRow label="Repay" value={cAmt ? ghs(cAmt * (1 + CREDIT.feeRate)) : '—'} />
             <SheetRow label="Due by" value={longDate(addMonths(CREDIT.months))} />
           </div>
@@ -476,7 +476,8 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
           onDone={() => {
             goalStore.update(goal.id, (g) => ({ ...g, credit: { amount: cAmt, due: iso(addMonths(CREDIT.months)) } }))
             goalStore.record(goal.id, 'credit', cAmt, 0, 'Credit against fixed deposit')
-            onToast(`${ghs(cAmt)} credit sent to your MoMo wallet`)
+            walletStore.addCredit(cAmt, goal.id, `Save Me credit · ${goal.name}`)
+            onToast(`${ghs(cAmt)} credit added to your available balance`)
             close()
           }}
         />
@@ -553,7 +554,7 @@ const KIND: Record<Activity['kind'], { label: string; sign: 1 | -1 | 0; icon: Re
   withdrawal: { label: 'Withdrawal', sign: -1, icon: <ArrowUpIcon size={18} /> },
   rescue: { label: 'Save Me rescue', sign: 1, icon: <HeartIcon size={18} /> },
   interest: { label: 'Milestone interest', sign: 1, icon: <VaultIcon size={18} /> },
-  credit: { label: 'Credit to wallet', sign: 0, icon: <UsersIcon size={18} /> },
+  credit: { label: 'Credit to Adawise wallet', sign: 0, icon: <UsersIcon size={18} /> },
 }
 
 function ActivityRow({ a }: { a: Activity }) {
