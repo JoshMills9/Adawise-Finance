@@ -283,7 +283,7 @@ export function ProfileTab() {
             <Row label="Goals you support" note={`${supporting.length}`} onClick={() => navigate('/adawise/supporting')} />
           </>
         )}
-        <Row label="Save Me credit" note={owed > 0 ? `${ghs(owed, 0)} to repay` : 'Nothing owed'} onClick={() => navigate('/adawise/credit')} />
+        <Row label="Save Me loan" note={owed > 0 ? `${ghs(owed, 0)} to repay` : 'Nothing owed'} onClick={() => navigate('/adawise/loan')} />
         <Row label="Next contributions" onClick={() => navigate('/adawise/contributions')} />
         <Row label="Notifications" note={unread ? `${unread} unread` : undefined} onClick={() => navigate('/adawise/notifications')} />
       </section>

@@ -125,12 +125,12 @@ export function GoalDetail() {
                 <VaultIcon size={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-bold text-ink">Save Me credit · {ghs(goal.credit.amount)}</p>
+                <p className="text-[15px] font-bold text-ink">Save Me loan · {ghs(goal.credit.amount)}</p>
                 <p className="text-[13px] text-muted">{ghs(creditLeft(goal.credit))} left to repay by {longDate(goal.credit.due)}</p>
               </div>
               <button
                 type="button"
-                onClick={() => navigate('/adawise/credit')}
+                onClick={() => navigate('/adawise/loan')}
                 className="h-[34px] shrink-0 rounded-full bg-ada px-[14px] text-[13px] font-bold text-white active:brightness-110"
               >
                 Repay
@@ -263,7 +263,7 @@ export function GoalDetail() {
             {rule.reason}. You chose {GOAL_TYPE_LABEL[goal.type].toLowerCase()} to stay committed. Keep going!
           </p>
         </div>
-        <Note>Need money for something unexpected? Save Me lets a partner help, or gives you credit against your fixed deposit, without breaking your goal.</Note>
+        <Note>Need money for something unexpected? Save Me lets a partner help, or gives you a loan against your fixed deposit, without breaking your goal.</Note>
         <div className="mt-5">
           <PrimaryButton onClick={() => setSheet('saveme')}>Use Save Me</PrimaryButton>
         </div>
@@ -350,10 +350,10 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
               disabled={!canCredit}
               onClick={() => setStage('credit')}
               icon={VaultIcon}
-              title="Get credit"
+              title="Get a loan"
               desc={
                 goal.credit
-                  ? 'You already have an active credit on this goal.'
+                  ? 'You already have an active loan on this goal.'
                   : canCredit
                     ? `Borrow up to ${ghs(creditLimit, 0)} against this goal's fixed deposit. Your savings keep growing.`
                     : `Available once this goal reaches its ${MILESTONES[0]}-month milestone and its savings move into a fixed deposit.`
@@ -448,7 +448,7 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
 
       {stage === 'credit' && (
         <>
-          <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Get credit</h2>
+          <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Get a loan</h2>
           <p className="mt-1 text-[14px] text-muted">Your fixed deposit is the collateral, so your goal stays intact.</p>
           <div className="mt-5">
             <Field
@@ -470,7 +470,7 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
           <p className="mt-3 text-center text-[12.5px] text-muted">Demo terms: {Math.round(CREDIT.feeRate * 100)}% fee over {CREDIT.months} months.</p>
           <div className="mt-4">
             <PrimaryButton disabled={cAmt <= 0 || cAmt > creditLimit} onClick={() => setStage('crediting')}>
-              Get {cAmt ? ghs(cAmt) : 'credit'}
+              Get {cAmt ? ghs(cAmt) : 'loan'}
             </PrimaryButton>
           </div>
           <button type="button" onClick={() => setStage('choose')} className="mt-1 h-[44px] w-full text-[15px] font-semibold text-muted">
@@ -483,9 +483,9 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
         <CreditProcessing
           onDone={() => {
             goalStore.update(goal.id, (g) => ({ ...g, credit: { amount: cAmt, due: iso(addMonths(CREDIT.months)), repaid: 0, takenOn: iso(new Date()) } }))
-            goalStore.record(goal.id, 'credit', cAmt, 0, 'Credit against fixed deposit')
-            walletStore.addCredit(cAmt, goal.id, `Save Me credit · ${goal.name}`)
-            onToast(`${ghs(cAmt)} credit added to your available balance`)
+            goalStore.record(goal.id, 'credit', cAmt, 0, 'Loan against fixed deposit')
+            walletStore.addCredit(cAmt, goal.id, `Save Me loan · ${goal.name}`)
+            onToast(`${ghs(cAmt)} loan added to your available balance`)
             close()
           }}
         />
@@ -501,7 +501,7 @@ function CreditProcessing({ onDone }: { onDone: () => void }) {
     const t = setTimeout(() => done.current(), 1500)
     return () => clearTimeout(t)
   }, [])
-  return <Processing title="Approving your credit…" subtitle="Checking your fixed deposit" />
+  return <Processing title="Approving your loan…" subtitle="Checking your fixed deposit" />
 }
 
 /* ---------- pieces ---------- */
@@ -562,8 +562,8 @@ const KIND: Record<Activity['kind'], { label: string; sign: 1 | -1 | 0; icon: Re
   withdrawal: { label: 'Withdrawal', sign: -1, icon: <ArrowUpIcon size={18} /> },
   rescue: { label: 'Save Me rescue', sign: 1, icon: <HeartIcon size={18} /> },
   interest: { label: 'Milestone interest', sign: 1, icon: <VaultIcon size={18} /> },
-  credit: { label: 'Credit to Adawise wallet', sign: 0, icon: <UsersIcon size={18} /> },
-  repayment: { label: 'Credit repayment', sign: 0, icon: <VaultIcon size={18} /> },
+  credit: { label: 'Loan to Adawise wallet', sign: 0, icon: <UsersIcon size={18} /> },
+  repayment: { label: 'Loan repayment', sign: 0, icon: <VaultIcon size={18} /> },
 }
 
 function ActivityRow({ a }: { a: Activity }) {

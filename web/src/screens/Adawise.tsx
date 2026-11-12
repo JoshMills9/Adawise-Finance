@@ -135,7 +135,6 @@ export function Adawise() {
               <div className="border-l border-[#e6e6e6] text-center">
                 <p className="text-[12.5px] text-muted">Available</p>
                 <p className="mt-[2px] text-[16px] font-bold text-ada-dark">{money(available)}</p>
-                {wallet.balance > 0 && <p className="text-[11px] leading-tight text-muted">incl. {hidden ? 'GHS ****' : ghs(wallet.balance, 0)} credit</p>}
               </div>
             </div>
             {/* Action row, like the MoMo wallet card (one line tall) */}
@@ -335,7 +334,7 @@ export function Adawise() {
         open={source !== null}
         mode="withdraw"
         title="Withdraw"
-        to={source?.kind === 'goal' ? source.goal.name : 'Credit balance'}
+        to={source?.kind === 'goal' ? source.goal.name : 'Loan balance'}
         max={source ? sourceAmount(source) : undefined}
         onClose={() => setSource(null)}
         onDone={(amt) => {
@@ -616,7 +615,7 @@ function WithdrawSourceSheet({
   const unlocked = goals.filter((g) => g.saved > 0 && withdrawRule(g).allowed)
   const lockedCount = goals.filter((g) => g.saved > 0 && !withdrawRule(g).allowed).length
   const options: { id: string; title: string; sub: string; amount: number; src: WithdrawSource }[] = [
-    ...(walletBalance > 0 ? [{ id: 'wallet', title: 'Credit balance', sub: 'Save Me credit in your Adawise wallet', amount: walletBalance, src: { kind: 'wallet', amount: walletBalance } as const }] : []),
+    ...(walletBalance > 0 ? [{ id: 'wallet', title: 'Loan balance', sub: 'Save Me loan in your Adawise wallet', amount: walletBalance, src: { kind: 'wallet', amount: walletBalance } as const }] : []),
     ...unlocked.map((g) => ({ id: g.id, title: g.name, sub: withdrawRule(g).reason, amount: g.saved, src: { kind: 'goal', goal: g } as const })),
   ]
   const choice = options.find((o) => o.id === picked)
@@ -734,7 +733,7 @@ const GOAL_ACTIVITY: Partial<Record<Activity['kind'], { title: string; sign: 1 |
   withdrawal: { title: 'Withdrawal', sign: -1, icon: <CashOutIcon size={18} /> },
   rescue: { title: 'Save Me rescue', sign: 1, icon: <HeartIcon size={18} /> },
   interest: { title: 'Milestone interest', sign: 1, icon: <VaultIcon size={18} /> },
-  repayment: { title: 'Credit repayment', sign: -1, icon: <VaultIcon size={18} /> },
+  repayment: { title: 'Loan repayment', sign: -1, icon: <VaultIcon size={18} /> },
   // 'credit' is shown once, from the wallet side
 }
 
@@ -749,8 +748,8 @@ function recentActivity(goals: Goal[], walletActivity: WalletEntry[]): FeedItem[
   // Repayments are listed once, from the goal side
   const fromWallet: FeedItem[] = walletActivity.filter((w) => w.kind !== 'repayment').map((w) =>
     w.kind === 'credit'
-      ? { id: w.id, date: w.date, title: 'Save Me credit', sub: `${goals.find((g) => g.id === w.goalId)?.name ?? 'Adawise wallet'} · to Available`, amount: w.amount, sign: 1, icon: <WalletIcon size={18} />, goalId: w.goalId }
-      : { id: w.id, date: w.date, title: 'Withdrawal', sub: 'Credit balance · to MoMo', amount: w.amount, sign: -1, icon: <CashOutIcon size={18} /> },
+      ? { id: w.id, date: w.date, title: 'Save Me loan', sub: `${goals.find((g) => g.id === w.goalId)?.name ?? 'Adawise wallet'} · to Available`, amount: w.amount, sign: 1, icon: <WalletIcon size={18} />, goalId: w.goalId }
+      : { id: w.id, date: w.date, title: 'Withdrawal', sub: 'Loan balance · to MoMo', amount: w.amount, sign: -1, icon: <CashOutIcon size={18} /> },
   )
   return [...fromWallet, ...fromGoals].sort((a, b) => b.date.localeCompare(a.date))
 }

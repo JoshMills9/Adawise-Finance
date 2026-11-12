@@ -29,14 +29,14 @@ export function Credit() {
   return (
     <div className="font-ada relative flex h-full flex-col bg-[#f4f6f7]">
       <main className="min-h-0 flex-1 overflow-y-auto pb-[calc(32px+env(safe-area-inset-bottom))]">
-        <DetailHeader title="Save Me credit" onBack={() => goBack(navigate, '/adawise/profile')}>
+        <DetailHeader title="Save Me loan" onBack={() => goBack(navigate, '/adawise/profile')}>
           <div className="px-6 pb-10 pt-2 text-center">
             <p className="text-[14px] text-white/75">{active.length ? 'Left to repay' : 'You owe nothing'}</p>
             <p className="mt-1 text-[32px] font-bold leading-tight">{ghs(owed)}</p>
             <p className="mt-1 text-[13.5px] text-white/75">
               {active.length
-                ? `${active.length} active credit${active.length > 1 ? 's' : ''} · next due ${longDate(active[0]!.credit.due)}`
-                : 'Credit against your fixed deposit shows up here'}
+                ? `${active.length} active loan${active.length > 1 ? 's' : ''} · next due ${longDate(active[0]!.credit.due)}`
+                : 'Loans against your fixed deposit show up here'}
             </p>
           </div>
         </DetailHeader>
@@ -44,7 +44,7 @@ export function Credit() {
         <section className="px-4 pt-5">
           {active.length > 0 ? (
             <>
-              <h2 className="pb-3 text-[17px] font-bold text-ink">Active credit</h2>
+              <h2 className="pb-3 text-[17px] font-bold text-ink">Active loans</h2>
               <div className="flex flex-col gap-3">
                 {active.map((g) => (
                   <CreditCard key={g.id} goal={g} onRepay={() => setRepaying(g)} onOpen={() => navigate(`/adawise/goal/${g.id}`)} />
@@ -56,7 +56,7 @@ export function Credit() {
               <span className="grid size-[56px] place-items-center rounded-full bg-ada-soft text-ada">
                 <CheckCircle size={28} />
               </span>
-              <p className="mt-3 text-[16px] font-bold text-ada-dark">No credit to repay</p>
+              <p className="mt-3 text-[16px] font-bold text-ada-dark">No loan to repay</p>
               <p className="mt-1 text-[13.5px] leading-snug text-muted">
                 Once a goal reaches its 3-month milestone, you can borrow against its fixed deposit from the goal's Save Me option.
               </p>
@@ -71,7 +71,7 @@ export function Credit() {
           <h2 className="pb-3 text-[17px] font-bold text-ink">How repayment works</h2>
           <div className={`${card} space-y-2 p-4 text-[13.5px] leading-snug text-ink`}>
             <p>You repay what you borrowed plus a {Math.round(CREDIT.feeRate * 100)}% fee within {CREDIT.months} months.</p>
-            <p>Pay it all at once or in parts, from your MoMo wallet or from credit you haven't spent yet.</p>
+            <p>Pay it all at once or in parts, from your MoMo wallet or from loan money you haven't spent yet.</p>
             <p>Your goal and fixed deposit keep growing while you repay.</p>
           </div>
         </section>
@@ -104,7 +104,7 @@ export function Credit() {
         walletBalance={wallet.balance}
         onClose={() => setRepaying(null)}
         onDone={(amt, cleared) => {
-          toast(cleared ? `Credit on ${repaying?.name} fully repaid` : `${ghs(amt)} repaid`)
+          toast(cleared ? `Loan on ${repaying?.name} fully repaid` : `${ghs(amt)} repaid`)
           setRepaying(null)
         }}
       />
@@ -189,10 +189,10 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
   }, [stage])
 
   return (
-    <Sheet open={goal !== null} onClose={stage === 'processing' ? undefined : onClose} label="Repay credit">
+    <Sheet open={goal !== null} onClose={stage === 'processing' ? undefined : onClose} label="Repay loan">
       {goal && stage === 'amount' && (
         <>
-          <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Repay credit</h2>
+          <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Repay loan</h2>
           <p className="mt-1 text-[14px] text-muted">
             {goal.name} · {ghs(left)} left to repay
           </p>
@@ -208,7 +208,7 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
               hint={
                 tooMuch
                   ? from === 'wallet' && walletBalance < left
-                    ? `Your credit balance is ${ghs(walletBalance)}`
+                    ? `Your loan balance is ${ghs(walletBalance)}`
                     : `You only owe ${ghs(left)}`
                   : amount > 0 && amount < left
                     ? `${ghs(left - amount)} will be left after this`
@@ -230,7 +230,7 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
           <p className="mt-5 text-[14px] font-semibold text-ada-dark">Pay from</p>
           <div className="mt-2 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] border border-[#e6ebec]">
             <SourceRow on={from === 'momo'} title="MoMo wallet" sub={DEMO_WALLET} onClick={() => setFrom('momo')} />
-            {walletBalance > 0 && <SourceRow on={from === 'wallet'} title="Credit balance" sub={`${ghs(walletBalance)} unspent in your Adawise wallet`} onClick={() => setFrom('wallet')} />}
+            {walletBalance > 0 && <SourceRow on={from === 'wallet'} title="Loan balance" sub={`${ghs(walletBalance)} unspent in your Adawise wallet`} onClick={() => setFrom('wallet')} />}
           </div>
 
           <div className="mt-5">
@@ -246,8 +246,8 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
           <p className="mt-5 text-center text-[14px] text-muted">{amount >= left ? 'Repay in full' : 'Part repayment'}</p>
           <p className="mt-1 text-center text-[32px] font-bold text-ada-dark">{ghs(amount)}</p>
           <div className="mt-5 divide-y divide-[#eef0f1] rounded-[14px] bg-[#f4f6f7] text-[14px]">
-            <SheetRow label="Credit" value={goal.name} />
-            <SheetRow label="From" value={from === 'momo' ? `MoMo wallet ${DEMO_WALLET}` : 'Adawise credit balance'} />
+            <SheetRow label="Loan" value={goal.name} />
+            <SheetRow label="From" value={from === 'momo' ? `MoMo wallet ${DEMO_WALLET}` : 'Adawise loan balance'} />
             <SheetRow label="Left after" value={ghs(Math.max(0, left - amount))} />
           </div>
           <p className="mt-3 text-center text-[12.5px] text-muted">Demo only. No real money moves and no PIN is needed.</p>
@@ -260,7 +260,7 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
         </>
       )}
 
-      {stage === 'processing' && <Processing title="Processing…" subtitle={from === 'momo' ? 'Waiting for MoMo confirmation' : 'Applying your credit balance'} />}
+      {stage === 'processing' && <Processing title="Processing…" subtitle={from === 'momo' ? 'Waiting for MoMo confirmation' : 'Applying your loan balance'} />}
     </Sheet>
   )
 }

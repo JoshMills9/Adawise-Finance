@@ -58,7 +58,7 @@ export function App() {
             <Route path="/adawise/circles" element={<CirclesTab />} />
             <Route path="/adawise/profile" element={<ProfileTab />} />
             <Route path="/adawise/badges" element={<Badges />} />
-            <Route path="/adawise/credit" element={<Credit />} />
+            <Route path="/adawise/loan" element={<Credit />} />
             <Route path="/adawise/contributions" element={<ContributionsList />} />
             <Route path="/adawise/supporting" element={<SupportingList />} />
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -70,7 +70,7 @@ const TERMS = [
   'Goal-locked savings stay locked until you reach your target. Time-locked savings stay locked until the date you choose.',
   'At 3, 6, 9 and 12 months, qualifying savings move into a fixed deposit and the interest is paid upfront.',
   'Save Me – Partner Support: Up to 3 successful rescues per calendar year. Partner contributions are voluntary and are not loans.',
-  'Save Me – Credit: Eligible users may apply for an advance or loan against their fixed-deposit savings to meet emergency financial needs, without breaking their investment. Approval and lending terms are subject to the applicable financial institution.',
+  'Save Me – Loan: Eligible users may apply for an advance or loan against their fixed-deposit savings to meet emergency financial needs, without breaking their investment. Approval and lending terms are subject to the applicable financial institution.',
   'Interest rates may change. We will tell you when they do.',
 ]
 

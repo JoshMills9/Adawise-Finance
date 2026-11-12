@@ -105,11 +105,11 @@ export const goalStore = {
       ...x,
       credit: cleared ? undefined : { ...x.credit!, repaid },
       activity: [
-        { id: uid('a'), kind: 'repayment', amount, date: todayIso(), note: cleared ? 'Credit fully repaid' : from === 'wallet' ? 'From credit balance' : 'From MoMo wallet' },
+        { id: uid('a'), kind: 'repayment', amount, date: todayIso(), note: cleared ? 'Loan fully repaid' : from === 'wallet' ? 'From loan balance' : 'From MoMo wallet' },
         ...(x.activity ?? []),
       ],
     }))
-    if (from === 'wallet') walletStore.spendOnRepayment(amount, id, `Credit repayment · ${g.name}`)
+    if (from === 'wallet') walletStore.spendOnRepayment(amount, id, `Loan repayment · ${g.name}`)
     return cleared
   },
   reset: goals.reset,
