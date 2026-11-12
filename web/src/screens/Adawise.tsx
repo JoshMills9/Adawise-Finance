@@ -42,14 +42,6 @@ type Icon = ComponentType<{ size?: number }>
 /** Max items per list on the Adawise home; the arrows open the full lists */
 const HOME_LIMIT = 3
 
-function CloseIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-      <path d="M5 5l14 14M19 5 5 19" />
-    </svg>
-  )
-}
-
 /** Adawise home tab: wallet → quick actions → requests → highlights → contributions → goals you support */
 export function Adawise() {
   useThemeColor(ADA_DARK)
@@ -80,14 +72,9 @@ export function Adawise() {
           />
 
           <div className="relative flex items-center justify-between px-[14px] pt-[calc(env(safe-area-inset-top)+10px)]">
-            <button
-              type="button"
-              aria-label="Close Adawise"
-              onClick={() => navigate('/home', { replace: true })}
-              className="grid size-11 place-items-center text-white active:opacity-60"
-            >
-              <CloseIcon />
-            </button>
+            <span className="grid size-11 place-items-center">
+              <img src="/brand/adawise-logo.png" alt="Adawise" width={38} height={38} className="size-[38px] object-contain brightness-0 invert" />
+            </span>
             <h1 className="text-[20px] font-bold tracking-[0.02em] text-white">Adawise</h1>
             <button
               type="button"
