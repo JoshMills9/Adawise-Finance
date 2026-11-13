@@ -1,10 +1,12 @@
-// First visit to Adawise from MoMo's Save screen: welcome → terms → Adawise home.
+// First visit to Adawise from MoMo's Save screen: welcome → terms → sign in → Adawise home.
 // In Adawise colours: #12212f bar with white back/close, teal buttons, #12212f / black text.
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ADA_DARK, BackPath, ClosePath, IconButton, PrimaryButton } from '../components/ada'
+import { ADA_DARK, BackPath, ClosePath, Field, IconButton, PrimaryButton } from '../components/ada'
 import { Footer } from '../components/ui'
 import { session } from '../lib/session'
+import { auth } from '../lib/api'
+import { errorText, signIn } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 
 const closeToHome = (navigate: ReturnType<typeof useNavigate>) => () => navigate('/home', { replace: true })
@@ -115,10 +117,73 @@ export function AdawiseTerms() {
           disabled={!agreed}
           onClick={() => {
             session.acceptAdawiseTerms()
-            navigate('/adawise', { replace: true })
+            navigate(auth.isSignedIn() ? '/adawise' : '/adawise/login', { replace: true })
           }}
         >
           Next
+        </PrimaryButton>
+      </Footer>
+    </div>
+  )
+}
+
+/** Adawise sign-in (after the terms): the MoMo number is the Adawise identity */
+export function AdawiseLogin() {
+  useThemeColor(ADA_DARK)
+  const navigate = useNavigate()
+  // MoMo sign-in stores "233XXXXXXXXX"; the field holds the 9 digits after +233
+  const [phone, setPhone] = useState(() => session.msisdn().replace(/^233/, '').slice(0, 9))
+  const [name, setName] = useState(() => auth.user()?.name ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const valid = /^\d{9}$/.test(phone) && name.trim().length >= 2
+
+  const submit = async () => {
+    if (!valid || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await signIn(`+233${phone}`, name.trim())
+      navigate('/adawise', { replace: true })
+    } catch (e) {
+      setError(errorText(e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="font-ada flex h-full flex-col bg-white">
+      <AdaTopBar title="Sign in" onBack={() => navigate(-1)} onClose={closeToHome(navigate)} />
+
+      <main className="min-h-0 flex-1 overflow-y-auto px-6 pt-7">
+        <h2 className="text-[24px] font-bold text-ada-dark">Sign in to Adawise</h2>
+        <p className="mt-2 text-[16px] leading-[1.45] text-muted">Use your MoMo number. Your Adawise savings are linked to it.</p>
+
+        <form
+          className="mt-6 flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void submit()
+          }}
+        >
+          <Field
+            label="MoMo number"
+            prefix="+233"
+            inputMode="numeric"
+            autoComplete="tel-national"
+            placeholder="24 123 4567"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').replace(/^0/, '').slice(0, 9))}
+          />
+          <Field label="Your name" autoComplete="name" placeholder="e.g. Ama Mensah" value={name} onChange={(e) => setName(e.target.value)} />
+          {error && <p className="rounded-[12px] bg-[#fdefef] px-4 py-3 text-[14px] text-[#b93535]">{error}</p>}
+          <button type="submit" hidden />
+        </form>
+      </main>
+
+      <Footer>
+        <PrimaryButton disabled={!valid || busy} onClick={() => void submit()}>
+          {busy ? 'Signing in…' : 'Continue'}
         </PrimaryButton>
       </Footer>
     </div>

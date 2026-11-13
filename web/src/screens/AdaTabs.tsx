@@ -1,10 +1,12 @@
 // Adawise bottom tabs (Home, Goals, Circles, Profile) and the Goals, Circles and Profile tab screens.
-import { useState, type ComponentType, type ReactNode } from 'react'
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ADA_DARK, Chip, DEMO_NAME, DEMO_WALLET } from '../components/ada'
+import { ADA_DARK, Chip, DEMO_NAME, DEMO_WALLET, EmptyState, card } from '../components/ada'
 import { ChevronRight, FlagIcon, HomeIcon, PlusIcon, ProfileIcon, SearchIcon, UsersIcon } from '../components/icons'
 import { GOAL_TYPE_LABEL, SHOW_PARTNER_SIDE, creditLeft, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
-import { useBadges, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
+import { useBadges, useCircles, useGoals, useProfile, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
+import { auth } from '../lib/api'
+import { refreshAdawise } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CircleCard, GoalCard } from './Adawise'
 
@@ -119,17 +121,12 @@ function FilterRow<T extends string>({ value, options, onChange }: { value: T; o
   )
 }
 
-function Empty({ text, action }: { text: string; action?: ReactNode }) {
-  return (
-    <div className="flex flex-col items-center gap-3 py-12 text-center">
-      <p className="text-[14px] text-muted">{text}</p>
-      {action}
-    </div>
-  )
-}
-
 function TabScreen({ children }: { children: ReactNode }) {
   useThemeColor(ADA_DARK)
+  // Each tab shows the latest from the API (cached data shows meanwhile)
+  useEffect(() => {
+    refreshAdawise().catch(() => undefined)
+  }, [])
   return (
     <div className="font-ada relative flex h-full flex-col bg-[#f4f6f7]">
       <main className={`min-h-0 flex-1 overflow-y-auto ${TAB_BAR_SPACE}`}>{children}</main>
@@ -177,12 +174,22 @@ export function GoalsTab() {
         {shown.map((g) => (
           <GoalCard key={g.id} goal={g} money={(n) => ghs(n)} onClick={() => navigate(`/adawise/goal/${g.id}`)} />
         ))}
-        {shown.length === 0 &&
-          (goals.length === 0 ? (
-            <Empty text="You haven't set any goals yet." action={<CreateButton label="Create a goal" onClick={create} />} />
-          ) : (
-            <Empty text={q ? `No goals match "${q.trim()}".` : 'No goals in this group yet.'} />
-          ))}
+        {shown.length === 0 && (
+          <div className={card}>
+            {goals.length === 0 ? (
+              <EmptyState
+                icon={<FlagIcon size={28} />}
+                title="No goals yet"
+                text="Pick something you're saving for and put a little towards it every week."
+                action={{ label: 'Create a goal', onClick: create }}
+              />
+            ) : q ? (
+              <EmptyState icon={<SearchIcon size={28} />} title="No matches" text={`No goals match "${q.trim()}". Try another name.`} />
+            ) : (
+              <EmptyState icon={<FlagIcon size={28} />} title="Nothing here yet" text="None of your goals are in this group." />
+            )}
+          </div>
+        )}
       </div>
     </TabScreen>
   )
@@ -228,12 +235,22 @@ export function CirclesTab() {
         {shown.map((c) => (
           <CircleCard key={c.id} circle={c} onClick={() => navigate(`/adawise/circle/${c.id}`)} />
         ))}
-        {shown.length === 0 &&
-          (circles.length === 0 ? (
-            <Empty text="Save together with friends and family." action={<CreateButton label="Create a circle" onClick={create} />} />
-          ) : (
-            <Empty text={q ? `No circles match "${q.trim()}".` : 'No circles in this group yet.'} />
-          ))}
+        {shown.length === 0 && (
+          <div className={card}>
+            {circles.length === 0 ? (
+              <EmptyState
+                icon={<UsersIcon size={28} />}
+                title="No circles yet"
+                text="Save together with friends and family. Everyone works towards their own goal."
+                action={{ label: 'Create a circle', onClick: create }}
+              />
+            ) : q ? (
+              <EmptyState icon={<SearchIcon size={28} />} title="No matches" text={`No circles match "${q.trim()}". Try another name.`} />
+            ) : (
+              <EmptyState icon={<UsersIcon size={28} />} title="Nothing here yet" text="None of your circles are in this group." />
+            )}
+          </div>
+        )}
       </div>
     </TabScreen>
   )
@@ -252,9 +269,18 @@ export function ProfileTab() {
   const badges = useBadges()
   const owed = goals.reduce((t, g) => t + (g.credit ? creditLeft(g.credit) : 0), 0)
   const earnedBadges = badges.filter((b) => b.earned).length
-  const { total } = totals(goals)
-  const initials = DEMO_NAME.split(' ')
-    .map((w) => w[0])
+  const profile = useProfile()
+  const name = profile?.name || auth.user()?.name || DEMO_NAME
+  const total = profile?.totalSaved ?? totals(goals).total
+  const owedNow = Math.max(owed, profile?.loanOwed ?? 0)
+  // "+233241380745" → "241 380 745", the way MoMo shows the number
+  const local = (profile?.phone ?? auth.user()?.phone ?? '').replace(/^\+?233/, '')
+  const wallet = local.length === 9 ? `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}` : DEMO_WALLET
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
     .join('')
 
   return (
@@ -264,8 +290,8 @@ export function ProfileTab() {
         style={{ borderBottomLeftRadius: '50% 22px', borderBottomRightRadius: '50% 22px' }}
       >
         <span className="mx-auto grid size-[72px] place-items-center rounded-full bg-white text-[24px] font-bold text-ada-dark">{initials}</span>
-        <h1 className="mt-3 text-[22px] font-bold">{DEMO_NAME}</h1>
-        <p className="mt-[2px] text-[14px] tracking-[0.04em] text-white/75">MoMo wallet {DEMO_WALLET}</p>
+        <h1 className="mt-3 text-[22px] font-bold">{name}</h1>
+        <p className="mt-[2px] text-[14px] tracking-[0.04em] text-white/75">MoMo wallet {wallet}</p>
       </header>
 
       <section className="mx-4 -mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[16px] bg-[#eef0f1] shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
@@ -283,7 +309,7 @@ export function ProfileTab() {
             <Row label="Goals you support" note={`${supporting.length}`} onClick={() => navigate('/adawise/supporting')} />
           </>
         )}
-        <Row label="Save Me loan" note={owed > 0 ? `${ghs(owed, 0)} to repay` : 'Nothing owed'} onClick={() => navigate('/adawise/loan')} />
+        <Row label="Save Me loan" note={owedNow > 0 ? `${ghs(owedNow, 0)} to repay` : 'Nothing owed'} onClick={() => navigate('/adawise/loan')} />
         <Row label="Next contributions" onClick={() => navigate('/adawise/contributions')} />
         <Row label="Notifications" note={unread ? `${unread} unread` : undefined} onClick={() => navigate('/adawise/notifications')} />
       </section>

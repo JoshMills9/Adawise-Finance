@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../components/ui'
-import { PlusIcon } from '../components/icons'
-import { ADA_DARK, Avatar, Check, DetailHeader, MoneySheet, PrimaryButton, Progress, Ring, SectionTitle, Sheet, Tag, card, goBack } from '../components/ada'
+import { PlusIcon, UsersIcon } from '../components/icons'
+import { ACTIVITY_LIMIT, ADA_DARK, Avatar, Check, DetailHeader, EmptyState, MoneySheet, PrimaryButton, Processing, Progress, Ring, SectionTitle, Sheet, ShowAllToggle, Tag, card, goBack } from '../components/ada'
 import { CONTACTS, MAX_CIRCLE_MEMBERS, circleProgress, ghs, memberPct, shortDate, type Circle } from '../lib/demoData'
 import { addMonths, contribution, firstName, initials, longDate, perLabel } from '../lib/format'
-import { circleStore, noticeStore, useCircle } from '../lib/goalStore'
+import { circleStore, useCircle } from '../lib/goalStore'
+import { ApiError } from '../lib/api'
+import { contributeToCircle, errorText, inviteToCircle, refreshCircle } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph, TrophyIcon } from '../components/goalIcons'
 
@@ -17,7 +19,34 @@ export function CircleDetail() {
   const [toast, toastNode] = useToast()
   const [adding, setAdding] = useState(false)
   const [inviting, setInviting] = useState(false)
+  const [showAllActivity, setShowAllActivity] = useState(false)
+  const [loading, setLoading] = useState(true)
   const back = () => goBack(navigate)
+
+  // Fresh members and progress from the API every time the circle opens
+  useEffect(() => {
+    if (!id) return
+    let live = true
+    setLoading(true)
+    refreshCircle(id)
+      .catch((e) => {
+        if (live && !(e instanceof ApiError && e.status === 404)) toast(errorText(e))
+      })
+      .finally(() => live && setLoading(false))
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  if (!circle && loading) {
+    return (
+      <div className="font-ada flex h-full flex-col items-center justify-center bg-[#f4f6f7]">
+        <Processing title="Loading your circle…" subtitle="Getting the latest from Adawise" />
+        {toastNode}
+      </div>
+    )
+  }
 
   if (!circle) {
     return (
@@ -140,19 +169,8 @@ export function CircleDetail() {
                 <span className="w-[16px]" />
                 <Avatar initials={m.initials} size={36} />
                 <p className="min-w-0 flex-1 text-[15px] font-semibold text-muted">{m.name}</p>
-                <button
-                  type="button"
-                  title="Demo: pretend they joined"
-                  onClick={() => {
-                    circleStore.update(circle.id, (c) => ({ ...c, members: c.members.map((x) => (x.name === m.name ? { ...x, status: 'active' } : x)) }))
-                    circleStore.log(circle.id, `${m.name} joined the circle`)
-                    noticeStore.push({ kind: 'circle', text: `${m.name} joined ${circle.name}`, link: `/adawise/circle/${circle.id}` })
-                  }}
-                  className="text-right"
-                >
-                  <Tag tone="amber">Invited</Tag>
-                  <span className="mt-1 block text-[11.5px] font-semibold text-ada">Simulate join</span>
-                </button>
+                {/* They join from their own Adawise app; the circle refreshes when it reopens */}
+                <Tag tone="amber">Invited</Tag>
               </div>
             ))}
             {circle.members.length < MAX_CIRCLE_MEMBERS && (
@@ -179,14 +197,20 @@ export function CircleDetail() {
 
           {/* Activity */}
           <SectionTitle title="Activity" />
-          <div className={`${card} divide-y divide-[#eef0f1]`}>
-            {circle.activity.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 px-4 py-3">
-                <span className="size-[8px] shrink-0 rounded-full bg-ada" />
-                <p className="min-w-0 flex-1 text-[14px] text-ink">{a.text}</p>
-                <span className="shrink-0 text-[12.5px] text-muted">{shortDate(a.date)}</span>
-              </div>
-            ))}
+          <div className={`${card} overflow-hidden`}>
+            <div className="divide-y divide-[#eef0f1]">
+              {(showAllActivity ? circle.activity : circle.activity.slice(0, ACTIVITY_LIMIT)).map((a) => (
+                <div key={a.id} className="flex items-center gap-3 px-4 py-3">
+                  <span className="size-[8px] shrink-0 rounded-full bg-ink" />
+                  <p className="min-w-0 flex-1 text-[14px] text-ink">{a.text}</p>
+                  <span className="shrink-0 text-[12.5px] text-muted">{shortDate(a.date)}</span>
+                </div>
+              ))}
+              {circle.activity.length === 0 && (
+                <EmptyState compact icon={<UsersIcon size={24} />} title="Quiet so far" text="Savings and new members in this circle will show up here." />
+              )}
+            </div>
+            <ShowAllToggle count={circle.activity.length} open={showAllActivity} onToggle={() => setShowAllActivity((v) => !v)} />
           </div>
         </div>
       </main>
@@ -197,9 +221,9 @@ export function CircleDetail() {
         title="Add to your circle savings"
         to={circle.name}
         suggestions={[...new Set([perPeriod, 50, 100])]}
+        run={(amt) => contributeToCircle(circle, amt)}
         onClose={() => setAdding(false)}
         onDone={(amt) => {
-          circleStore.update(circle.id, (c) => ({ ...c, members: c.members.map((m) => (m.you ? { ...m, saved: m.saved + amt } : m)) }))
           circleStore.log(circle.id, `You saved ${ghs(amt)}`)
           setAdding(false)
           toast(`${ghs(amt)} added to ${circle.name}`)
@@ -229,15 +253,21 @@ function InviteSheet({ open, circle, onClose, onToast }: { open: boolean; circle
     onClose()
     setTimeout(() => setPicked([]), 300)
   }
-  const send = () => {
-    circleStore.update(circle.id, (c) => ({
-      ...c,
-      members: [...c.members, ...picked.map((n) => ({ name: firstName(n), initials: initials(n), saved: 0, status: 'invited' as const }))],
-    }))
-    const names = picked.map(firstName).join(', ')
-    circleStore.log(circle.id, `You invited ${names}`)
-    onToast(`Invites sent to ${names}`)
-    close()
+  const [busy, setBusy] = useState(false)
+  const send = async () => {
+    const phones = picked.map((n) => CONTACTS.find((c) => c.name === n)?.phone).filter((p): p is string => !!p)
+    setBusy(true)
+    try {
+      await inviteToCircle(circle.id, phones)
+      const names = picked.map(firstName).join(', ')
+      circleStore.log(circle.id, `You invited ${names}`)
+      onToast(`Invites sent to ${names}`)
+      close()
+    } catch (e) {
+      onToast(errorText(e))
+    } finally {
+      setBusy(false)
+    }
   }
   return (
     <Sheet open={open} onClose={close} label="Invite people">
@@ -269,8 +299,8 @@ function InviteSheet({ open, circle, onClose, onToast }: { open: boolean; circle
         })}
       </div>
       <div className="mt-5">
-        <PrimaryButton disabled={!picked.length} onClick={send}>
-          {picked.length ? `Invite ${picked.length}` : 'Choose people'}
+        <PrimaryButton disabled={!picked.length || busy} onClick={() => void send()}>
+          {busy ? 'Sending invites…' : picked.length ? `Invite ${picked.length}` : 'Choose people'}
         </PrimaryButton>
       </div>
     </Sheet>

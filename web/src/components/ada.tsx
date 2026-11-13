@@ -5,12 +5,72 @@ import type { NavigateFunction } from "react-router-dom"
 import { ghs } from '../lib/demoData'
 import { PERIODS, amountOf, cleanAmount } from '../lib/format'
 import { BulbIcon, CheckMark } from './goalIcons'
+import { ChevronRight } from './icons'
 
 export type Icon = ComponentType<{ size?: number }>
 export const ADA_DARK = '#12212F'
 export const DEMO_WALLET = '241 234 567'
 export const DEMO_NAME = 'Ama Mensah'
 export const card = 'rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]'
+
+/**
+ * Friendly placeholder for an empty list: icon in a soft disc, a short title, one line of help
+ * and an optional action. `compact` fits inside a card; the default suits a whole screen.
+ */
+export function EmptyState({
+  icon,
+  title,
+  text,
+  action,
+  compact,
+}: {
+  icon: ReactNode
+  title: string
+  text?: string
+  action?: { label: string; onClick: () => void }
+  compact?: boolean
+}) {
+  return (
+    <div className={`flex flex-col items-center text-center ${compact ? 'px-6 pb-6 pt-7' : 'px-8 py-12'}`}>
+      <span className={`relative grid place-items-center ${compact ? 'size-[64px]' : 'size-[84px]'}`}>
+        <span className="absolute inset-0 rounded-full border-[1.5px] border-dashed border-[#d5dedf]" />
+        <span className={`grid place-items-center rounded-full bg-surface text-ink ${compact ? 'size-[48px]' : 'size-[64px]'}`}>{icon}</span>
+      </span>
+      <p className={`font-bold text-ada-dark ${compact ? 'mt-3 text-[15.5px]' : 'mt-4 text-[17px]'}`}>{title}</p>
+      {text && <p className="mt-1 max-w-[270px] text-[13.5px] leading-relaxed text-muted">{text}</p>}
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          className="mt-4 h-[40px] rounded-full bg-ada-dark px-5 text-[14px] font-semibold text-white transition active:scale-[0.97]"
+        >
+          {action.label}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Activity lists show this many items until expanded */
+export const ACTIVITY_LIMIT = 5
+
+/** "Show all (n)" / "Show less" footer for a list capped at ACTIVITY_LIMIT; renders nothing when the list fits */
+export function ShowAllToggle({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
+  if (count <= ACTIVITY_LIMIT) return null
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onToggle}
+      className="flex w-full items-center justify-center gap-1 border-t border-[#eef0f1] py-3 text-[14px] font-semibold text-ada active:bg-[#f7f9f9]"
+    >
+      {open ? 'Show less' : `Show all (${count})`}
+      <span className={`transition-transform ${open ? '-rotate-90' : 'rotate-90'}`}>
+        <ChevronRight size={16} />
+      </span>
+    </button>
+  )
+}
 
 /* ---------- layout ---------- */
 
@@ -440,6 +500,7 @@ export function MoneySheet({
   fixedAmount,
   suggestions = [],
   max,
+  run,
   onClose,
   onDone,
 }: {
@@ -450,13 +511,18 @@ export function MoneySheet({
   fixedAmount?: number
   suggestions?: number[]
   max?: number
+  /** The real payment (API call + waiting for MoMo). Without it, processing is a short pause. */
+  run?: (amount: number) => Promise<unknown>
   onClose: () => void
   onDone: (amount: number) => void
 }) {
-  const [stage, setStage] = useState<'amount' | 'confirm' | 'processing'>('amount')
+  const [stage, setStage] = useState<'amount' | 'confirm' | 'processing' | 'failed'>('amount')
   const [value, setValue] = useState('')
+  const [error, setError] = useState('')
   const done = useRef(onDone)
   done.current = onDone
+  const runRef = useRef(run)
+  runRef.current = run
 
   useEffect(() => {
     if (!open) return
@@ -467,8 +533,23 @@ export function MoneySheet({
   const amount = fixedAmount ?? amountOf(value)
   useEffect(() => {
     if (stage !== 'processing') return
-    const t = setTimeout(() => done.current(amount), 1500)
-    return () => clearTimeout(t)
+    const pay = runRef.current
+    if (!pay) {
+      const t = setTimeout(() => done.current(amount), 1500)
+      return () => clearTimeout(t)
+    }
+    let live = true
+    pay(amount).then(
+      () => live && done.current(amount),
+      (e: unknown) => {
+        if (!live) return
+        setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+        setStage('failed')
+      },
+    )
+    return () => {
+      live = false
+    }
   }, [stage, amount])
 
   const withdraw = mode === 'withdraw'
@@ -535,6 +616,19 @@ export function MoneySheet({
       )}
 
       {stage === 'processing' && <Processing title="Processing…" subtitle="Waiting for MoMo confirmation" />}
+
+      {stage === 'failed' && (
+        <div className="flex flex-col items-center pt-8 text-center">
+          <p className="text-[18px] font-bold text-ada-dark">{withdraw ? "Withdrawal didn't go through" : "Payment didn't go through"}</p>
+          <p className="mt-2 max-w-[300px] text-[14px] text-muted">{error}</p>
+          <div className="mt-6 w-full">
+            <PrimaryButton onClick={() => setStage('confirm')}>Try again</PrimaryButton>
+          </div>
+          <button type="button" onClick={onClose} className="mt-1 h-[44px] w-full text-[15px] font-semibold text-muted active:opacity-60">
+            Close
+          </button>
+        </div>
+      )}
     </Sheet>
   )
 }
@@ -544,16 +638,18 @@ export function PaymentSheet({
   open,
   amount,
   goalName,
+  run,
   onCancel,
   onApproved,
 }: {
   open: boolean
   amount: number
   goalName: string
+  run?: (amount: number) => Promise<unknown>
   onCancel: () => void
   onApproved: () => void
 }) {
-  return <MoneySheet open={open} mode="deposit" title="Confirm payment" to={goalName} fixedAmount={amount} onClose={onCancel} onDone={() => onApproved()} />
+  return <MoneySheet open={open} mode="deposit" title="Confirm payment" to={goalName} fixedAmount={amount} run={run} onClose={onCancel} onDone={() => onApproved()} />
 }
 
 /** Back to wherever a screen was opened from; `fallback` if it was opened directly */

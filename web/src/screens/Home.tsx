@@ -2,6 +2,7 @@ import { useState, type ComponentType } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import { DEMO_DISABLED, PillButton, TextButton, useToast } from '../components/ui'
+import { signOutAdawise } from '../lib/goalStore'
 import { session } from '../lib/session'
 import {
   AirtimeIcon,
@@ -57,6 +58,7 @@ export function Home() {
 
   const logOut = () => {
     session.signOut()
+    signOutAdawise()
     navigate('/welcome', { replace: true })
   }
 

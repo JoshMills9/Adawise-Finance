@@ -1,5 +1,6 @@
+import { useEffect, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Splash } from './screens/Splash'
 import { Onboarding } from './screens/Onboarding'
 import { Welcome } from './screens/Welcome'
@@ -18,10 +19,27 @@ import { ContributionsList, SupportingList } from './screens/Lists'
 import { CirclesTab, GoalsTab, ProfileTab, isAdaTab } from './screens/AdaTabs'
 import { Badges } from './screens/Badges'
 import { Credit } from './screens/Credit'
-import { AdawiseTerms, AdawiseWelcome } from './screens/AdawiseIntro'
+import { AdawiseLogin, AdawiseTerms, AdawiseWelcome } from './screens/AdawiseIntro'
+import { auth, UNAUTHORIZED_EVENT } from './lib/api'
+import { session } from './lib/session'
+
+/** Adawise screens need the terms accepted and an Adawise session */
+function Ada({ children }: { children: ReactNode }) {
+  if (!session.hasAcceptedAdawiseTerms()) return <Navigate to="/adawise/welcome" replace />
+  if (!auth.isSignedIn()) return <Navigate to="/adawise/login" replace />
+  return children
+}
 
 export function App() {
   const location = useLocation()
+  const navigate = useNavigate()
+
+  // The backend rejected the token: sign in to Adawise again
+  useEffect(() => {
+    const onExpired = () => navigate('/adawise/login', { replace: true })
+    window.addEventListener(UNAUTHORIZED_EVENT, onExpired)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onExpired)
+  }, [navigate])
 
   return (
     // Phone-width column: full screen on mobile, centred "device" on desktop
@@ -46,21 +64,22 @@ export function App() {
             <Route path="/save" element={<Save />} />
             <Route path="/adawise/welcome" element={<AdawiseWelcome />} />
             <Route path="/adawise/terms" element={<AdawiseTerms />} />
-            <Route path="/adawise" element={<Adawise />} />
-            <Route path="/adawise/new-goal" element={<NewGoal />} />
-            <Route path="/adawise/goal/:id" element={<GoalDetail />} />
-            <Route path="/adawise/new-circle" element={<NewCircle />} />
-            <Route path="/adawise/circle/:id" element={<CircleDetail />} />
-            <Route path="/adawise/requests" element={<RequestsList />} />
-            <Route path="/adawise/requests/:id" element={<RequestDetail />} />
-            <Route path="/adawise/notifications" element={<Notifications />} />
-            <Route path="/adawise/goals" element={<GoalsTab />} />
-            <Route path="/adawise/circles" element={<CirclesTab />} />
-            <Route path="/adawise/profile" element={<ProfileTab />} />
-            <Route path="/adawise/badges" element={<Badges />} />
-            <Route path="/adawise/loan" element={<Credit />} />
-            <Route path="/adawise/contributions" element={<ContributionsList />} />
-            <Route path="/adawise/supporting" element={<SupportingList />} />
+            <Route path="/adawise/login" element={<AdawiseLogin />} />
+            <Route path="/adawise" element={<Ada><Adawise /></Ada>} />
+            <Route path="/adawise/new-goal" element={<Ada><NewGoal /></Ada>} />
+            <Route path="/adawise/goal/:id" element={<Ada><GoalDetail /></Ada>} />
+            <Route path="/adawise/new-circle" element={<Ada><NewCircle /></Ada>} />
+            <Route path="/adawise/circle/:id" element={<Ada><CircleDetail /></Ada>} />
+            <Route path="/adawise/requests" element={<Ada><RequestsList /></Ada>} />
+            <Route path="/adawise/requests/:id" element={<Ada><RequestDetail /></Ada>} />
+            <Route path="/adawise/notifications" element={<Ada><Notifications /></Ada>} />
+            <Route path="/adawise/goals" element={<Ada><GoalsTab /></Ada>} />
+            <Route path="/adawise/circles" element={<Ada><CirclesTab /></Ada>} />
+            <Route path="/adawise/profile" element={<Ada><ProfileTab /></Ada>} />
+            <Route path="/adawise/badges" element={<Ada><Badges /></Ada>} />
+            <Route path="/adawise/loan" element={<Ada><Credit /></Ada>} />
+            <Route path="/adawise/contributions" element={<Ada><ContributionsList /></Ada>} />
+            <Route path="/adawise/supporting" element={<Ada><SupportingList /></Ada>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </motion.div>

@@ -3,5 +3,8 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/((?!assets/|icons/|brand/|illustrations/|adawise/highlights/|sw.js|workbox-|manifest.webmanifest|registerSW.js).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://adawise-momo-backend.onrender.com/api/:path*" },
+    { "source": "/((?!api/|assets/|icons/|brand/|illustrations/|adawise/highlights/|sw.js|workbox-|manifest.webmanifest|registerSW.js).*)", "destination": "/index.html" }
+  ]
 }
