@@ -30,6 +30,8 @@ Illustrations are square, `.jpg` or `.png`. Resize to ~900px to keep the app lig
 
 ## Flow
 
-`/` splash → `/onboarding` → `/welcome` (number) → `/verify` (auto-verify) → `/otp` → `/home` (placeholder)
+`/` splash → `/onboarding` → `/welcome` (number) → `/verify` (auto-verify) → `/otp` → `/home` (MoMo home) → `/save` → `/adawise/welcome` → `/adawise/terms` → `/adawise/login` → `/adawise`
+
+The MoMo part is simulated. Adawise signs in against the backend (`POST /auth/session`) and uses the real API from then on; `/api` is proxied to the backend by Vite (`vite.config.ts`) and Vercel (`vercel.json`). See the root README for the API setup.
 
 Colours and the font live in `src/index.css` (`@theme`). Shared pieces (buttons, top bar, placeholders) are in `src/components/ui.tsx`.
