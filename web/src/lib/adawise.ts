@@ -523,3 +523,30 @@ export async function updateGoalSettings(goalId: string, patch: { autoSave?: boo
 }
 
 export const errorText = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+
+/* ---------- closing, leaving, removing ---------- */
+
+/** Closes a goal for good. The API needs its balance at zero first. */
+export async function closeGoal(goalId: string) {
+  await api.post(`/goals/${goalId}/close/`)
+  goalStore.remove(goalId)
+  void refreshWallet().catch(() => undefined)
+}
+
+/** Sends what's left in the goal to MoMo, then closes it */
+export async function withdrawAllAndClose(goal: Goal) {
+  if (goal.saved > 0) await withdrawFromGoal(goal.id, goal.saved)
+  await closeGoal(goal.id)
+}
+
+/** Leaves a circle (not its owner). Your goal in it becomes a personal goal, money and all. */
+export async function leaveCircle(circleId: string) {
+  await api.post(`/circles/${circleId}/leave/`)
+  circleStore.remove(circleId)
+  await refreshGoals()
+}
+
+export async function removePartner(goalId: string, partnerId: string) {
+  await api.delete(`/goals/${goalId}/partners/${partnerId}/`)
+  await refreshGoal(goalId)
+}

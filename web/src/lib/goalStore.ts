@@ -66,6 +66,7 @@ const goals = createStore<Goal[]>('adawise.api.goals', [])
 export const goalStore = {
   all: () => goals.get(),
   replaceAll: (list: Goal[]) => goals.set(list),
+  remove: (id: string) => goals.set(goals.get().filter((g) => g.id !== id)),
   upsert: (g: Goal) => goals.set(goals.get().some((x) => x.id === g.id) ? goals.get().map((x) => (x.id === g.id ? g : x)) : [g, ...goals.get()]),
   add: (g: Goal) => goals.set([g, ...goals.get()]),
   update: (id: string, fn: (g: Goal) => Goal) => goals.set(goals.get().map((g) => (g.id === id ? fn(g) : g))),
@@ -163,6 +164,7 @@ const circles = createStore<Circle[]>('adawise.api.circles', [])
 export const circleStore = {
   all: () => circles.get(),
   replaceAll: (list: Circle[]) => circles.set(list),
+  remove: (id: string) => circles.set(circles.get().filter((c) => c.id !== id)),
   upsert: (c: Circle) => circles.set(circles.get().some((x) => x.id === c.id) ? circles.get().map((x) => (x.id === c.id ? c : x)) : [c, ...circles.get()]),
   add: (c: Circle) => circles.set([c, ...circles.get()]),
   update: (id: string, fn: (c: Circle) => Circle) => circles.set(circles.get().map((c) => (c.id === id ? fn(c) : c))),

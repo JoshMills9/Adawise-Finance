@@ -6,6 +6,8 @@ import {
   ACTIVITY_LIMIT,
   ADA_DARK,
   Avatar,
+  ConfirmSheet,
+  DangerLink,
   DetailHeader,
   EmptyState,
   Field,
@@ -40,15 +42,16 @@ import {
   withdrawRule,
   type Activity,
   type Goal,
+  type Partner,
 } from '../lib/demoData'
 import { addMonths, amountOf, cleanAmount, firstName, initials, iso, longDate, perLabel } from '../lib/format'
 import { goalStore, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
 import { ApiError } from '../lib/api'
-import { askPartner, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
+import { removePartner, withdrawAllAndClose, askPartner, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CheckMark, Glyph } from '../components/goalIcons'
 
-type SheetName = null | 'deposit' | 'withdraw' | 'locked' | 'saveme' | 'partner'
+type SheetName = null | 'deposit' | 'withdraw' | 'locked' | 'saveme' | 'partner' | 'close'
 
 const TYPE_ICON: Record<Goal['type'], Icon> = { flexible: DropletIcon, 'goal-locked': LockIcon, 'time-locked': ClockIcon }
 
@@ -63,6 +66,7 @@ export function GoalDetail() {
   const saveMe = useSaveMe()
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [removing, setRemoving] = useState<Partner | null>(null)
   const back = () => goBack(navigate)
 
   // Fresh detail + activity from the API every time the goal opens
@@ -220,12 +224,19 @@ export function GoalDetail() {
                   <p className="text-[15px] font-semibold text-ink">{p.name}</p>
                   <p className="text-[12.5px] text-muted">{p.role === 'saver' ? 'Saving with you · WiseCircle' : 'Supporter · can help through Save Me'}</p>
                 </div>
-                {p.status === 'invited' ? (
-                  // They accept in their own Adawise app; the goal refreshes when it reopens
-                  <Tag tone="amber">Invited</Tag>
-                ) : (
-                  <Tag tone="teal">Active</Tag>
-                )}
+                <div className="flex flex-col items-end">
+                  {p.status === 'invited' ? (
+                    // They accept in their own Adawise app; the goal refreshes when it reopens
+                    <Tag tone="amber">Invited</Tag>
+                  ) : (
+                    <Tag tone="teal">Active</Tag>
+                  )}
+                  {p.id && (
+                    <button type="button" onClick={() => setRemoving(p)} className="mt-1 text-[12px] font-semibold text-muted active:text-[#c23a3a]">
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             {(goal.partners?.length ?? 0) < MAX_PARTNERS && (
@@ -254,6 +265,9 @@ export function GoalDetail() {
             </div>
             <ShowAllToggle count={activity.length} open={showAllActivity} onToggle={() => setShowAllActivity((v) => !v)} />
           </div>
+
+          {/* Closing needs an empty goal; while it's locked with money in it, there's no way out yet */}
+          {(goal.saved === 0 || rule.allowed) && <DangerLink onClick={() => setSheet('close')}>Close goal</DangerLink>}
         </div>
       </main>
 
@@ -302,6 +316,34 @@ export function GoalDetail() {
           Keep saving
         </button>
       </Sheet>
+      <ConfirmSheet
+        open={sheet === 'close'}
+        title={`Close ${goal.name}?`}
+        text={
+          goal.saved > 0
+            ? `We'll send the ${ghs(goal.saved)} in this goal to your MoMo wallet, then close it. Its plan and reminders stop. This can't be undone.`
+            : "The goal's plan and reminders stop, and it leaves your goals. This can't be undone."
+        }
+        confirmLabel={goal.saved > 0 ? `Withdraw ${ghs(goal.saved)} & close` : 'Close goal'}
+        busyTitle={goal.saved > 0 ? 'Withdrawing and closing…' : 'Closing your goal…'}
+        busySubtitle={goal.saved > 0 ? 'Waiting for MoMo confirmation' : 'This takes a moment'}
+        run={() => withdrawAllAndClose(goal)}
+        onClose={() => setSheet(null)}
+        onDone={() => navigate('/adawise/goals', { replace: true })}
+      />
+      <ConfirmSheet
+        open={removing !== null}
+        title={`Remove ${removing?.name ?? 'partner'}?`}
+        text={`${removing?.name ?? 'They'} will stop getting updates on ${goal.name} and can't help you through Save Me. You can invite someone else after.`}
+        confirmLabel="Remove partner"
+        busyTitle="Removing partner…"
+        run={() => removePartner(goal.id, removing!.id!)}
+        onClose={() => setRemoving(null)}
+        onDone={() => {
+          toast(`${removing?.name} removed from ${goal.name}`)
+          setRemoving(null)
+        }}
+      />
       <AddPartnerSheet open={sheet === 'partner'} goal={goal} onClose={() => setSheet(null)} onToast={toast} />
       <SaveMeSheet open={sheet === 'saveme'} goal={goal} left={saveMe.left} onClose={() => setSheet(null)} onToast={toast} />
 

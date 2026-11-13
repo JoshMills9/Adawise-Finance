@@ -633,6 +633,83 @@ export function MoneySheet({
   )
 }
 
+/**
+ * "Are you sure?" sheet for actions that can't be undone (close a goal, leave a circle, remove
+ * a partner). `run` does the work; the sheet shows progress, and the error with a retry if it fails.
+ */
+export function ConfirmSheet({
+  open,
+  title,
+  text,
+  confirmLabel,
+  busyTitle = 'Working on it…',
+  busySubtitle = 'This takes a moment',
+  run,
+  onClose,
+  onDone,
+}: {
+  open: boolean
+  title: string
+  text: ReactNode
+  confirmLabel: string
+  busyTitle?: string
+  busySubtitle?: string
+  run: () => Promise<unknown>
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [stage, setStage] = useState<'ask' | 'busy' | 'failed'>('ask')
+  const [error, setError] = useState('')
+  useEffect(() => {
+    if (open) setStage('ask')
+  }, [open])
+
+  const go = async () => {
+    setStage('busy')
+    try {
+      await run()
+      onDone()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+      setStage('failed')
+    }
+  }
+
+  return (
+    <Sheet open={open} onClose={stage === 'busy' ? undefined : onClose} label={title}>
+      {stage === 'busy' ? (
+        <Processing title={busyTitle} subtitle={busySubtitle} />
+      ) : (
+        <>
+          <h2 className="mt-4 text-[20px] font-bold text-ada-dark">{stage === 'failed' ? "That didn't work" : title}</h2>
+          <p className="mt-2 text-[14.5px] leading-relaxed text-muted">{stage === 'failed' ? error : text}</p>
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => void go()}
+              className="h-[54px] w-full rounded-full bg-[#c23a3a] text-[16px] font-semibold text-white transition active:brightness-110"
+            >
+              {stage === 'failed' ? 'Try again' : confirmLabel}
+            </button>
+          </div>
+          <button type="button" onClick={onClose} className="mt-1 h-[44px] w-full text-[15px] font-semibold text-muted active:opacity-60">
+            Cancel
+          </button>
+        </>
+      )}
+    </Sheet>
+  )
+}
+
+/** Quiet red text button for the end of a details page (close goal, leave circle) */
+export function DangerLink({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="mt-6 h-[48px] w-full rounded-[14px] text-[15px] font-semibold text-[#c23a3a] active:bg-[#fdefef]">
+      {children}
+    </button>
+  )
+}
+
 /** Confirm-only payment (used when the amount is already known) */
 export function PaymentSheet({
   open,

@@ -2,7 +2,7 @@
 
 13 Nov 2026
 
-The Adawise app is now wired to the API. Testing it against `https://adawise-momo-backend.onrender.com/api/v1` found one blocker (CORS), 9 places where the spec and the server disagree, 9 fields the app needs on existing endpoints, and 5 missing endpoints. Each item says what to change.
+The Adawise app is now wired to the API. Testing it against `https://adawise-momo-backend.onrender.com/api/v1` found one blocker (CORS), 9 places where the spec and the server disagree, 9 fields the app needs on existing endpoints, and 7 missing endpoints. Each item says what to change.
 
 ## At a glance
 
@@ -35,6 +35,8 @@ Start with the high-priority items: they block features the app already has.
 | M3 | Partners | No cheer endpoint | Medium |
 | M4 | Circles | No circle activity feed | Medium |
 | M5 | Save Me | No endpoint for a single Save Me request | Low |
+| M6 | Circles | The owner can't end or leave a circle | Medium |
+| M7 | Goals | No "withdraw everything and close" in one call | Low |
 
 ## Blockers outside the spec
 
@@ -306,3 +308,22 @@ After asking a partner for help, the app follows the request until it's approved
 
 - `GET /saveme/requests/{id}/` → `SaveMeRequest`, readable by both the saver and the partner
 - Optional: send notifications `saveme_approved`, `saveme_declined` and `saveme_completed` to the saver (some already exist) so the app can stop polling
+
+### M6. Let the owner end or hand over a circle
+
+`POST /circles/{id}/leave/` returns `400 owner_cannot_leave` for the owner, and there's no other way out, so an owner is stuck in their circle for good. The app only shows **Leave circle** to members for now.
+
+Add one (or both):
+
+- `POST /circles/{id}/end/` (owner only): closes the circle; every member's circle goal becomes a personal goal with its money, like leaving does. Notify members with a `circle_ended` notification.
+- `POST /circles/{id}/transfer/` with `{"member_id": "…"}` (owner only): makes another joined member the owner, after which the old owner can leave.
+
+Also: `leave/` answers `{"detail": "You have left the circle."}`. It's a success, so it's fine, but returning the member's new personal goal (`{"goal": { …GoalRead… }}`) would save the app a refetch.
+
+### M7. Withdraw everything and close a goal in one call
+
+`POST /goals/{id}/close/` needs a zero balance (`400 balance_not_zero`, "Withdraw your GHS 25.00 first."). The app's **Close goal** button withdraws the balance to MoMo first, waits up to ~2 minutes for the payment (B2), then closes. If the app is closed in between, the goal is left empty but open.
+
+- Option: `POST /goals/{id}/close/` with `{"withdraw_remaining": true}` and an `Idempotency-Key`: the server withdraws the balance and closes the goal once the payout succeeds, returning the `PaymentAttempt`.
+- Smaller: `GET /goals/` returns closed goals by default. Default to `status=active,completed` so clients don't need to filter.
+

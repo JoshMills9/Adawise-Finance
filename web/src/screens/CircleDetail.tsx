@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../components/ui'
 import { PlusIcon, UsersIcon } from '../components/icons'
-import { ACTIVITY_LIMIT, ADA_DARK, Avatar, Check, DetailHeader, EmptyState, MoneySheet, PrimaryButton, Processing, Progress, Ring, SectionTitle, Sheet, ShowAllToggle, Tag, card, goBack } from '../components/ada'
+import { ACTIVITY_LIMIT, ADA_DARK, Avatar, Check, ConfirmSheet, DangerLink, DetailHeader, EmptyState, MoneySheet, PrimaryButton, Processing, Progress, Ring, SectionTitle, Sheet, ShowAllToggle, Tag, card, goBack } from '../components/ada'
 import { CONTACTS, MAX_CIRCLE_MEMBERS, circleProgress, ghs, memberPct, shortDate, type Circle } from '../lib/demoData'
 import { addMonths, contribution, firstName, initials, longDate, perLabel } from '../lib/format'
 import { circleStore, useCircle } from '../lib/goalStore'
 import { ApiError } from '../lib/api'
-import { contributeToCircle, errorText, inviteToCircle, refreshCircle } from '../lib/adawise'
+import { contributeToCircle, errorText, inviteToCircle, leaveCircle, refreshCircle } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph, TrophyIcon } from '../components/goalIcons'
 
@@ -21,6 +21,7 @@ export function CircleDetail() {
   const [inviting, setInviting] = useState(false)
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [leaving, setLeaving] = useState(false)
   const back = () => goBack(navigate)
 
   // Fresh members and progress from the API every time the circle opens
@@ -212,6 +213,9 @@ export function CircleDetail() {
             </div>
             <ShowAllToggle count={circle.activity.length} open={showAllActivity} onToggle={() => setShowAllActivity((v) => !v)} />
           </div>
+
+          {/* The owner can't leave (the API has no way to end or hand over a circle yet) */}
+          {circle.isOwner === false && <DangerLink onClick={() => setLeaving(true)}>Leave circle</DangerLink>}
         </div>
       </main>
 
@@ -228,6 +232,16 @@ export function CircleDetail() {
           setAdding(false)
           toast(`${ghs(amt)} added to ${circle.name}`)
         }}
+      />
+      <ConfirmSheet
+        open={leaving}
+        title={`Leave ${circle.name}?`}
+        text={`Your savings stay yours${me && me.saved > 0 ? ` (${ghs(me.saved)})` : ''}: they move into a personal goal called ${circle.name}. You'll stop seeing the others' progress, and you'd need a new invite to come back.`}
+        confirmLabel="Leave circle"
+        busyTitle="Leaving the circle…"
+        run={() => leaveCircle(circle.id)}
+        onClose={() => setLeaving(false)}
+        onDone={() => navigate('/adawise/circles', { replace: true })}
       />
       <InviteSheet open={inviting} circle={circle} onClose={() => setInviting(false)} onToast={toast} />
       {toastNode}
