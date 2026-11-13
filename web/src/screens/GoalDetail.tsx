@@ -3,9 +3,11 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useToast } from '../components/ui'
 import { ClockIcon, DropletIcon, LifebuoyIcon, LockIcon, PlusIcon, UsersIcon, VaultIcon } from '../components/icons'
 import {
+  ACTIVITY_LIMIT,
   ADA_DARK,
   Avatar,
   DetailHeader,
+  EmptyState,
   Field,
   HeartIcon,
   MoneySheet,
@@ -18,6 +20,7 @@ import {
   SectionTitle,
   Sheet,
   SheetRow,
+  ShowAllToggle,
   Tag,
   ToggleRow,
   card,
@@ -39,7 +42,9 @@ import {
   type Goal,
 } from '../lib/demoData'
 import { addMonths, amountOf, cleanAmount, firstName, initials, iso, longDate, perLabel } from '../lib/format'
-import { goalStore, noticeStore, saveMeStore, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
+import { goalStore, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
+import { ApiError } from '../lib/api'
+import { askPartner, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CheckMark, Glyph } from '../components/goalIcons'
 
@@ -56,7 +61,34 @@ export function GoalDetail() {
   const [toast, toastNode] = useToast()
   const [sheet, setSheet] = useState<SheetName>(() => (params.get('action') === 'add' ? 'deposit' : null))
   const saveMe = useSaveMe()
+  const [showAllActivity, setShowAllActivity] = useState(false)
+  const [loading, setLoading] = useState(true)
   const back = () => goBack(navigate)
+
+  // Fresh detail + activity from the API every time the goal opens
+  useEffect(() => {
+    if (!id) return
+    let live = true
+    setLoading(true)
+    refreshGoal(id)
+      .catch((e) => {
+        if (live && !(e instanceof ApiError && e.status === 404)) toast(errorText(e))
+      })
+      .finally(() => live && setLoading(false))
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  if (!goal && loading) {
+    return (
+      <div className="font-ada flex h-full flex-col items-center justify-center bg-[#f4f6f7]">
+        <Processing title="Loading your goal…" subtitle="Getting the latest from Adawise" />
+        {toastNode}
+      </div>
+    )
+  }
 
   if (!goal) {
     return (
@@ -74,6 +106,7 @@ export function GoalDetail() {
   const TypeIcon = TYPE_ICON[goal.type]
   const per = goal.plan ? perLabel(goal.plan.frequency) : 'week'
   const suggested = goal.plan?.amount ?? goal.nextContribution?.amount ?? 50
+  const activity = goal.activity ?? []
 
   return (
     <div className="font-ada relative flex h-full flex-col bg-[#f4f6f7]">
@@ -161,13 +194,13 @@ export function GoalDetail() {
                   title="Auto-save from MoMo"
                   desc={`Move ${ghs(goal.plan.amount, 0)} every ${per}`}
                   on={goal.plan.autoSave}
-                  onChange={(v) => goalStore.update(goal.id, (g) => ({ ...g, plan: { ...g.plan!, autoSave: v } }))}
+                  onChange={(v) => updateGoalSettings(goal.id, { autoSave: v }).catch((e) => toast(errorText(e)))}
                 />
                 <ToggleRow
                   title="Reminders"
                   desc="A nudge before each saving day"
                   on={goal.plan.reminders}
-                  onChange={(v) => goalStore.update(goal.id, (g) => ({ ...g, plan: { ...g.plan!, reminders: v } }))}
+                  onChange={(v) => updateGoalSettings(goal.id, { reminders: v }).catch((e) => toast(errorText(e)))}
                 />
               </div>
             </>
@@ -188,21 +221,8 @@ export function GoalDetail() {
                   <p className="text-[12.5px] text-muted">{p.role === 'saver' ? 'Saving with you · WiseCircle' : 'Supporter · can help through Save Me'}</p>
                 </div>
                 {p.status === 'invited' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      goalStore.update(goal.id, (g) => ({
-                        ...g,
-                        partners: g.partners?.map((x) => (x.name === p.name ? { ...x, status: 'active' } : x)),
-                      }))
-                      noticeStore.push({ kind: 'partner', text: `${p.name} accepted your invite for ${goal.name}`, link: `/adawise/goal/${goal.id}` })
-                    }}
-                    className="text-right"
-                    title="Demo: pretend the partner accepted"
-                  >
-                    <Tag tone="amber">Invited</Tag>
-                    <span className="mt-1 block text-[11.5px] font-semibold text-ada">Simulate accept</span>
-                  </button>
+                  // They accept in their own Adawise app; the goal refreshes when it reopens
+                  <Tag tone="amber">Invited</Tag>
                 ) : (
                   <Tag tone="teal">Active</Tag>
                 )}
@@ -217,11 +237,22 @@ export function GoalDetail() {
 
           {/* Activity */}
           <SectionTitle title="Activity" />
-          <div className={`${card} divide-y divide-[#eef0f1]`}>
-            {(goal.activity ?? []).length === 0 && <p className="px-4 py-5 text-center text-[14px] text-muted">No activity yet. Add money to get started.</p>}
-            {(goal.activity ?? []).map((a) => (
-              <ActivityRow key={a.id} a={a} />
-            ))}
+          <div className={`${card} overflow-hidden`}>
+            <div className="divide-y divide-[#eef0f1]">
+              {activity.length === 0 && (
+                <EmptyState
+                  compact
+                  icon={<PlusIcon size={24} />}
+                  title="No activity yet"
+                  text="Every deposit and withdrawal on this goal will show up here."
+                  action={{ label: 'Add money', onClick: () => setSheet('deposit') }}
+                />
+              )}
+              {(showAllActivity ? activity : activity.slice(0, ACTIVITY_LIMIT)).map((a) => (
+                <ActivityRow key={a.id} a={a} />
+              ))}
+            </div>
+            <ShowAllToggle count={activity.length} open={showAllActivity} onToggle={() => setShowAllActivity((v) => !v)} />
           </div>
         </div>
       </main>
@@ -233,9 +264,9 @@ export function GoalDetail() {
         title="Add money"
         to={goal.name}
         suggestions={[...new Set([suggested, 50, 100, 200])]}
+        run={(amt) => contributeToGoal(goal.id, amt)}
         onClose={() => setSheet(null)}
         onDone={(amt) => {
-          goalStore.record(goal.id, 'deposit', amt, +amt)
           setSheet(null)
           toast(`${ghs(amt)} added to ${goal.name}`)
         }}
@@ -246,9 +277,9 @@ export function GoalDetail() {
         title="Withdraw"
         to={goal.name}
         max={goal.saved}
+        run={(amt) => withdrawFromGoal(goal.id, amt)}
         onClose={() => setSheet(null)}
         onDone={(amt) => {
-          goalStore.record(goal.id, 'withdrawal', amt, -amt)
           setSheet(null)
           toast(`${ghs(amt)} sent to your MoMo wallet`)
         }}
@@ -288,6 +319,8 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
   const [who, setWho] = useState<string>('')
   const [amount, setAmount] = useState('')
   const [creditAmt, setCreditAmt] = useState('')
+  const [sending, setSending] = useState(false)
+  const [request, setRequest] = useState<{ id: string; status: SaveMeStatus } | null>(null)
 
   const partners = (goal.partners ?? []).filter((p) => p.status !== 'invited')
   const fdReached = monthsSince(goal.createdAt) >= MILESTONES[0]!
@@ -307,7 +340,49 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
       setWho('')
       setAmount('')
       setCreditAmt('')
+      setRequest(null)
     }, 300)
+  }
+
+  // The partner answers in their own app: follow the request until it settles
+  useEffect(() => {
+    if (stage !== 'waiting' || !request) return
+    let live = true
+    const t = setInterval(async () => {
+      const r = await saveMeRequest(request.id).catch(() => undefined)
+      if (!live || !r || r.status === request.status) return
+      setRequest({ id: r.id, status: r.status })
+      if (r.status === 'completed') {
+        void refreshGoal(goal.id).catch(() => undefined)
+        void refreshSaveMe().catch(() => undefined)
+        onToast(`${r.partner_name ?? askLabel} sent ${ghs(amt)} to ${goal.name}`)
+        close()
+      } else if (r.status === 'declined' || r.status === 'expired' || r.status === 'failed' || r.status === 'cancelled') {
+        onToast(r.status === 'declined' ? 'Request declined. Your Save Me count is unchanged' : r.status === 'expired' ? 'Request expired. Your Save Me count is unchanged' : 'The rescue payment didn’t go through')
+        close()
+      }
+    }, 4000)
+    return () => {
+      live = false
+      clearInterval(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, request])
+
+  const send = async () => {
+    // One open request at a time on the API: "Both partners" asks the first one
+    const partner = who === 'both' ? partners[0] : partners.find((p) => p.name === who)
+    if (!partner?.id) return onToast('This partner isn’t ready yet. Try again in a moment.')
+    setSending(true)
+    try {
+      const r = await askPartner(goal.id, partner.id, amt)
+      setRequest({ id: r.id, status: r.status })
+      setStage('waiting')
+    } catch (e) {
+      onToast(errorText(e))
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -403,8 +478,8 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
             />
           </div>
           <div className="mt-6">
-            <PrimaryButton disabled={!who || amt <= 0 || overDue} onClick={() => setStage('waiting')}>
-              Send request{who ? ` to ${askLabel}` : ''}
+            <PrimaryButton disabled={!who || amt <= 0 || overDue || sending} onClick={() => void send()}>
+              {sending ? 'Sending request…' : `Send request${who ? ` to ${askLabel}` : ''}`}
             </PrimaryButton>
           </div>
           <button type="button" onClick={() => setStage('choose')} className="mt-1 h-[44px] w-full text-[15px] font-semibold text-muted">
@@ -419,30 +494,34 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
           <p className="-mt-4 text-center text-[13.5px] leading-relaxed text-muted">
             {askLabel} gets a MoMo request and approves it with their Save Me PIN. Declined requests don't use up a Save Me.
           </p>
+          {request?.status === 'approved' && <p className="mt-3 text-center text-[13.5px] font-semibold text-ada-dark">Approved. Waiting for their MoMo payment…</p>}
           <div className="mt-6">
             <PrimaryButton
               onClick={() => {
-                const helper = who === 'both' ? partners[0]!.name : who
-                goalStore.record(goal.id, 'rescue', amt, +amt, `Save Me from ${helper}`)
-                saveMeStore.use()
-                noticeStore.push({ kind: 'saveme', text: `${helper} sent ${ghs(amt)} to ${goal.name} through Save Me`, link: `/adawise/goal/${goal.id}` })
-                onToast(`${helper} sent ${ghs(amt)} to ${goal.name}`)
+                onToast(`Request sent. We'll let you know when ${askLabel} answers`)
                 close()
               }}
             >
-              Simulate approval (demo)
+              Done
             </PrimaryButton>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              onToast('Request declined. Your Save Me count is unchanged')
-              close()
-            }}
-            className="mt-1 h-[44px] w-full text-[15px] font-semibold text-muted"
-          >
-            Simulate decline
-          </button>
+          {request?.status === 'pending' && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await cancelSaveMe(request.id)
+                  onToast('Request cancelled. Your Save Me count is unchanged')
+                  close()
+                } catch (e) {
+                  onToast(errorText(e))
+                }
+              }}
+              className="mt-1 h-[44px] w-full text-[15px] font-semibold text-muted"
+            >
+              Cancel request
+            </button>
+          )}
         </>
       )}
 
@@ -519,9 +598,11 @@ function Action({ icon: I, label, onClick, badge, muted, divider }: { icon: Icon
 }
 
 function Milestones({ goal }: { goal: Goal }) {
-  const months = monthsSince(goal.createdAt)
-  const interest = (goal.activity ?? []).filter((a) => a.kind === 'interest').reduce((s, a) => s + a.amount, 0)
-  const next = MILESTONES.find((m) => months < m)
+  // The API's milestone progress wins; until it loads, work it out from the start date
+  const months = goal.milestones?.months ?? monthsSince(goal.createdAt)
+  const interest = goal.milestones?.interest ?? (goal.activity ?? []).filter((a) => a.kind === 'interest').reduce((s, a) => s + a.amount, 0)
+  const reached = (m: number) => (goal.milestones ? goal.milestones.earned.includes(m) : months >= m)
+  const next = MILESTONES.find((m) => !reached(m))
   return (
     <div className={`${card} p-4`}>
       <div className="relative flex justify-between">
@@ -531,7 +612,7 @@ function Milestones({ goal }: { goal: Goal }) {
           style={{ width: `calc((100% - 36px) * ${Math.min(1, Math.max(0, (months - 3) / 9))})` }}
         />
         {MILESTONES.map((m) => {
-          const done = months >= m
+          const done = reached(m)
           return (
             <div key={m} className="relative flex w-[36px] flex-col items-center">
               <span className={`grid size-[36px] place-items-center rounded-full text-[13px] font-bold ring-4 ring-white ${done ? 'bg-ada text-white' : 'bg-[#e6ebec] text-muted'}`}>
@@ -545,7 +626,7 @@ function Milestones({ goal }: { goal: Goal }) {
       <p className="mt-4 text-[13.5px] leading-relaxed text-ink">
         {next ? (
           <>
-            {months >= 3 ? 'Savings are in a fixed deposit. ' : ''}Next milestone in <b>{next - months} month{next - months === 1 ? '' : 's'}</b>. Keep saving to earn interest, paid upfront.
+            {reached(3) ? 'Savings are in a fixed deposit. ' : ''}Next milestone in <b>{Math.max(1, next - months)} month{Math.max(1, next - months) === 1 ? '' : 's'}</b>. Keep saving to earn interest, paid upfront.
           </>
         ) : (
           'All milestones reached. Brilliant consistency!'
@@ -570,7 +651,7 @@ function ActivityRow({ a }: { a: Activity }) {
   const k = KIND[a.kind]
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      <span className={`grid size-[36px] shrink-0 place-items-center rounded-full ${k.sign < 0 ? 'bg-[#fdefef] text-[#b93535]' : 'bg-ada-soft text-ada'}`}>{k.icon}</span>
+      <span className="grid size-[36px] shrink-0 place-items-center rounded-full bg-surface text-ink">{k.icon}</span>
       <div className="min-w-0 flex-1">
         <p className="text-[14.5px] font-semibold text-ink">{k.label}</p>
         <p className="truncate text-[12.5px] text-muted">
@@ -608,15 +689,23 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
       setRole(null)
     }, 300)
   }
-  const send = () => {
+  const [busy, setBusy] = useState(false)
+  const send = async () => {
     const name = firstName(who)
-    goalStore.update(goal.id, (g) => ({
-      ...g,
-      partners: [...(g.partners ?? []), { name, initials: initials(who), role: role!, status: 'invited' as const }].slice(0, MAX_PARTNERS),
-    }))
-    noticeStore.push({ kind: 'invite', text: `Invite sent to ${name} to ${role === 'saver' ? 'save with you on' : 'support'} ${goal.name}`, link: `/adawise/goal/${goal.id}` })
-    onToast(`Invite sent to ${name}`)
-    close()
+    const phone = CONTACTS.find((c) => c.name === who)?.phone
+    if (!phone) return
+    setBusy(true)
+    try {
+      // The API has no saver/supporter choice yet, so only the phone is sent
+      await invitePartner(goal.id, phone)
+      await refreshGoal(goal.id)
+      onToast(`Invite sent to ${name}`)
+      close()
+    } catch (e) {
+      onToast(errorText(e))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -647,8 +736,8 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
         </>
       )}
       <div className="mt-5">
-        <PrimaryButton disabled={!who || !role} onClick={send}>
-          Send invite{who ? ` to ${firstName(who)}` : ''}
+        <PrimaryButton disabled={!who || !role || busy} onClick={() => void send()}>
+          {busy ? 'Sending invite…' : `Send invite${who ? ` to ${firstName(who)}` : ''}`}
         </PrimaryButton>
       </div>
     </Sheet>

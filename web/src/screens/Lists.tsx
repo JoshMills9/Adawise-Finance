@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { ADA_DARK, DetailHeader, PrimaryButton, card, goBack } from '../components/ada'
+import { ADA_DARK, DetailHeader, EmptyState, PrimaryButton, card, goBack } from '../components/ada'
+import { ClockIcon, UsersIcon } from '../components/icons'
 import { ghs } from '../lib/demoData'
 import { noticeStore, useGoals, useSupporting } from '../lib/goalStore'
 import { useToast } from '../components/ui'
@@ -38,7 +39,9 @@ export function ContributionsList() {
         {list.map((g) => (
           <ContributionRow key={g.id} goal={g} money={money} onOpen={() => navigate(`/adawise/goal/${g.id}`)} onPay={() => navigate(`/adawise/goal/${g.id}?action=add`)} />
         ))}
-        {list.length === 0 && <p className="px-4 py-8 text-center text-[14px] text-muted">Nothing due. Nice work!</p>}
+        {list.length === 0 && (
+          <EmptyState icon={<ClockIcon size={28} />} title="Nothing due" text="When a goal has a saving plan, its next payment shows up here." />
+        )}
       </div>
     </ListShell>
   )
@@ -60,7 +63,11 @@ export function SupportingList() {
             }}
           />
         ))}
-        {supporting.length === 0 && <p className="py-10 text-center text-[14px] text-muted">When someone makes you their partner, their goal shows up here.</p>}
+        {supporting.length === 0 && (
+          <div className={card}>
+            <EmptyState icon={<UsersIcon size={28} />} title="No goals to support yet" text="When someone makes you their accountability partner, their goal shows up here." />
+          </div>
+        )}
       </div>
       {toastNode}
     </ListShell>

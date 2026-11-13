@@ -1,9 +1,10 @@
 import { useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BadgeIcon, LifebuoyIcon, PlusIcon, UsersIcon, VaultIcon } from '../components/icons'
-import { ADA_DARK, DetailHeader, HeartIcon, card, goBack } from '../components/ada'
+import { BadgeIcon, BellIcon, LifebuoyIcon, PlusIcon, UsersIcon, VaultIcon } from '../components/icons'
+import { ADA_DARK, DetailHeader, EmptyState, HeartIcon, card, goBack } from '../components/ada'
 import { shortDate, type Notice } from '../lib/demoData'
-import { noticeStore, useNotices } from '../lib/goalStore'
+import { useNotices } from '../lib/goalStore'
+import { markAllNoticesRead, refreshNotices } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 
 const ICON: Record<Notice['kind'], { icon: ReactNode; tone: string }> = {
@@ -24,8 +25,17 @@ export function Notifications() {
 
   // Opening the list counts as reading them (after a beat, so the "new" dots are visible first)
   useEffect(() => {
-    const t = setTimeout(noticeStore.markAllRead, 1500)
-    return () => clearTimeout(t)
+    let live = true
+    let t: ReturnType<typeof setTimeout> | undefined
+    refreshNotices()
+      .catch(() => undefined)
+      .finally(() => {
+        if (live) t = setTimeout(() => void markAllNoticesRead().catch(() => undefined), 1500)
+      })
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
   }, [])
 
   const Row = ({ n }: { n: Notice }) => (
@@ -46,7 +56,11 @@ export function Notifications() {
           <div className="h-6" />
         </DetailHeader>
         <div className="px-4 pt-4">
-          {notices.length === 0 && <p className="py-10 text-center text-[14px] text-muted">No notifications yet.</p>}
+          {notices.length === 0 && (
+            <div className={card}>
+              <EmptyState icon={<BellIcon size={28} />} title="You're all caught up" text="We'll let you know about payments, milestones and your partners here." />
+            </div>
+          )}
           {unread.length > 0 && (
             <>
               <h2 className="mb-2 text-[15px] font-bold text-ink">New</h2>

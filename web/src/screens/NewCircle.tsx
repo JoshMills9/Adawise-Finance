@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -25,8 +25,10 @@ import {
   goBack,
 } from '../components/ada'
 import { MAX_CIRCLE_MEMBERS, ghs, type Circle, type Frequency } from '../lib/demoData'
-import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, longDate, perLabel, todayIso, uid } from '../lib/format'
+import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, longDate, perLabel } from '../lib/format'
 import { circleStore } from '../lib/goalStore'
+import { useToast } from '../components/ui'
+import { contributeToCircle, createCircle, errorText } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
 
@@ -82,27 +84,36 @@ export function NewCircle() {
   }
   const exit = () => goBack(navigate)
 
-  const create = () => {
-    const c: Circle = {
-      id: uid('circle'),
+  const [busy, setBusy] = useState(false)
+  const [toast, toastNode] = useToast()
+  // Set once the circle exists on the server, so a retried first saving doesn't create it twice
+  const saved = useRef<Circle | null>(null)
+
+  const createOnServer = async (): Promise<Circle> => {
+    if (saved.current) return saved.current
+    saved.current = await createCircle({
       name: d.name.trim(),
       icon: d.icon,
-      targetPerMember: target,
+      target,
       months: d.months,
       frequency: d.frequency,
-      createdAt: todayIso(),
+      phones: d.members.map((m) => m.phone),
       showAmounts: d.showAmounts,
-      members: [
-        { name: 'You', initials: 'YO', saved: deposit, status: 'active', you: true },
-        ...d.members.map((m) => ({ name: firstName(m.name), initials: initials(m.name), saved: 0, status: 'invited' as const })),
-      ],
-      activity: [
-        ...(deposit > 0 ? [{ id: uid('c'), text: `You saved ${ghs(deposit)} to start`, date: todayIso() }] : []),
-        { id: uid('c'), text: `You created the circle and invited ${d.members.length}`, date: todayIso() },
-      ],
+    })
+    circleStore.log(saved.current.id, `You created the circle and invited ${d.members.length}`)
+    return saved.current
+  }
+
+  /** No first saving: just create */
+  const create = async () => {
+    setBusy(true)
+    try {
+      setCreated(await createOnServer())
+    } catch (e) {
+      toast(errorText(e))
+    } finally {
+      setBusy(false)
     }
-    circleStore.add(c)
-    setCreated(c)
   }
 
   if (created) {
@@ -296,14 +307,14 @@ export function NewCircle() {
 
       <div className="shrink-0 border-t border-[#e6ebec] bg-white px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
         <PrimaryButton
-          disabled={!valid}
+          disabled={!valid || busy}
           onClick={() => {
             if (step < STEPS.length - 1) go(step + 1)
             else if (deposit > 0) setPaying(true)
-            else create()
+            else void create()
           }}
         >
-          {step === STEPS.length - 1 ? (deposit > 0 ? `Create circle & pay ${ghs(deposit)}` : 'Create circle') : 'Continue'}
+          {busy ? 'Creating circle…' : step === STEPS.length - 1 ? (deposit > 0 ? `Create circle & pay ${ghs(deposit)}` : 'Create circle') : 'Continue'}
         </PrimaryButton>
       </div>
 
@@ -311,12 +322,18 @@ export function NewCircle() {
         open={paying}
         amount={deposit}
         goalName={d.name.trim()}
+        run={async (amt) => {
+          const c = await createOnServer()
+          await contributeToCircle(c, amt)
+          circleStore.log(c.id, `You saved ${ghs(amt)} to start`)
+        }}
         onCancel={() => setPaying(false)}
         onApproved={() => {
           setPaying(false)
-          create()
+          if (saved.current) setCreated(saved.current)
         }}
       />
+      {toastNode}
     </div>
   )
 }

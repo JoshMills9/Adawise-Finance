@@ -1,9 +1,10 @@
-// Dummy Adawise data for the hackathon demo. Replace with calls to the Adawise backend.
+// Adawise app types, rules and maths. Goals, circles, wallet and notifications come from the
+// Adawise API (lib/adawise.ts); the dummy data left here is the partner side, still hidden.
 
 export type GoalType = 'flexible' | 'goal-locked' | 'time-locked'
 export type Frequency = 'daily' | 'weekly' | 'monthly'
 
-export type Partner = { name: string; initials: string; role: 'saver' | 'supporter'; status?: 'invited' | 'active' }
+export type Partner = { name: string; initials: string; role: 'saver' | 'supporter'; status?: 'invited' | 'active'; /** API GoalPartner id */ id?: string }
 export const MAX_PARTNERS = 2
 
 export type ActivityKind = 'deposit' | 'auto-save' | 'withdrawal' | 'rescue' | 'interest' | 'credit' | 'repayment'
@@ -25,6 +26,10 @@ export type Goal = {
   plan?: { frequency: Frequency; months: number; amount: number; autoSave: boolean; reminders: boolean }
   icon?: string
   activity?: Activity[]
+  /** Milestone progress reported by the API (overrides the local maths when present) */
+  milestones?: { months: number; interest: number; earned: number[] }
+  /** Lock state reported by the API (overrides the local lock maths when present) */
+  lock?: { locked: boolean; message?: string }
   /** Active Save Me credit taken against this goal's fixed deposit */
   credit?: { amount: number; due: string; repaid?: number; takenOn?: string }
 }
@@ -43,116 +48,16 @@ export type Circle = {
   showAmounts: boolean
   members: CircleMember[]
   activity: { id: string; text: string; date: string }[]
+  /** API: the circle's goal for you (adding money pays into it) */
+  myGoalId?: string
+  isOwner?: boolean
 }
 
 export const MAX_CIRCLE_MEMBERS = 10
 
-export const GOALS: Goal[] = [
-  {
-    id: 'laptop',
-    name: 'New laptop',
-    icon: 'laptop',
-    type: 'goal-locked',
-    saved: 3200,
-    target: 5000,
-    createdAt: '2026-04-20',
-    partners: [{ name: 'Kofi', initials: 'KA', role: 'saver', status: 'active' }],
-    nextContribution: { amount: 250, due: '2026-11-15' },
-    plan: { frequency: 'weekly', months: 12, amount: 250, autoSave: true, reminders: true },
-    activity: [
-      { id: 'l4', kind: 'auto-save', amount: 250, date: '2026-11-08' },
-      { id: 'l3', kind: 'auto-save', amount: 250, date: '2026-11-01' },
-      { id: 'l2', kind: 'interest', amount: 60, date: '2026-10-20', note: '6-month milestone' },
-      { id: 'l1', kind: 'deposit', amount: 500, date: '2026-10-14' },
-    ],
-  },
-  {
-    id: 'rent',
-    name: 'Rent',
-    icon: 'home',
-    type: 'time-locked',
-    saved: 750,
-    target: 3000,
-    createdAt: '2026-09-12',
-    unlockDate: '2027-03-12',
-    partners: [
-      { name: 'Esi', initials: 'EB', role: 'supporter', status: 'active' },
-      { name: 'Yaw', initials: 'YM', role: 'supporter', status: 'active' },
-    ],
-    nextContribution: { amount: 500, due: '2026-11-18' },
-    plan: { frequency: 'monthly', months: 6, amount: 500, autoSave: true, reminders: true },
-    activity: [
-      { id: 'r2', kind: 'auto-save', amount: 500, date: '2026-10-18' },
-      { id: 'r1', kind: 'deposit', amount: 250, date: '2026-09-12', note: 'First deposit' },
-    ],
-  },
-  {
-    id: 'emergency',
-    name: 'Emergency',
-    icon: 'medical',
-    type: 'flexible',
-    saved: 200,
-    target: 500,
-    createdAt: '2026-07-01',
-    nextContribution: { amount: 50, due: '2026-11-20' },
-    plan: { frequency: 'weekly', months: 3, amount: 50, autoSave: false, reminders: true },
-    activity: [
-      { id: 'e3', kind: 'withdrawal', amount: 100, date: '2026-10-30', note: 'Hospital bill' },
-      { id: 'e2', kind: 'deposit', amount: 150, date: '2026-09-02' },
-      { id: 'e1', kind: 'deposit', amount: 150, date: '2026-07-01', note: 'First deposit' },
-    ],
-  },
-]
-
-export const CIRCLES: Circle[] = [
-  {
-    id: 'hostel',
-    name: 'Hostel fund',
-    icon: 'home',
-    targetPerMember: 2000,
-    months: 6,
-    frequency: 'weekly',
-    createdAt: '2026-09-01',
-    showAmounts: false,
-    members: [
-      { name: 'Ama', initials: 'AM', saved: 1640, status: 'active' },
-      { name: 'You', initials: 'YO', saved: 1280, status: 'active', you: true },
-      { name: 'Efua', initials: 'EF', saved: 1160, status: 'active' },
-      { name: 'Kofi', initials: 'KA', saved: 1100, status: 'active' },
-      { name: 'Yaw', initials: 'YB', saved: 620, status: 'active' },
-    ],
-    activity: [
-      { id: 'h4', text: 'Ama saved this week · 82% there', date: '2026-11-09' },
-      { id: 'h3', text: 'Kofi passed the halfway mark', date: '2026-11-04' },
-      { id: 'h2', text: 'You saved this week · 64% there', date: '2026-11-02' },
-      { id: 'h1', text: 'Yaw joined the circle', date: '2026-09-03' },
-    ],
-  },
-  {
-    id: 'trip',
-    name: 'Family trip',
-    icon: 'travel',
-    targetPerMember: 1500,
-    months: 9,
-    frequency: 'monthly',
-    createdAt: '2026-10-01',
-    showAmounts: true,
-    members: [
-      { name: 'You', initials: 'YO', saved: 360, status: 'active', you: true },
-      { name: 'Akos', initials: 'AK', saved: 270, status: 'active' },
-      { name: 'Nana', initials: 'NA', saved: 270, status: 'active' },
-    ],
-    activity: [
-      { id: 't2', text: 'Akos and Nana saved for October', date: '2026-10-28' },
-      { id: 't1', text: 'You created the circle', date: '2026-10-01' },
-    ],
-  },
-]
-
 export const SAVE_ME = { used: 1, allowed: 3 }
 export const FIXED_DEPOSITS = 2000
 export const INTEREST_EARNED = 75
-export const PARTNER_REQUESTS = 1
 export const MILESTONES = [3, 6, 9, 12]
 /** Demo terms for Save Me credit against a fixed deposit */
 export const CREDIT = { maxShare: 0.8, months: 3, feeRate: 0.06 }
@@ -174,7 +79,7 @@ export function shortDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
-export const totals = (goals: Goal[] = GOALS) => {
+export const totals = (goals: Goal[]) => {
   const total = goals.reduce((s, g) => s + g.saved, 0)
   const available = goals.filter((g) => g.type === 'flexible').reduce((s, g) => s + g.saved, 0)
   return { total, locked: total - available, available }
@@ -195,14 +100,17 @@ export function daysUntil(iso: string) {
 export function withdrawRule(g: Goal): { allowed: boolean; reason: string } {
   if (g.type === 'flexible') return { allowed: true, reason: 'Withdraw anytime' }
   if (g.type === 'goal-locked') {
-    return g.saved >= g.target
+    const open = g.lock ? !g.lock.locked : g.saved >= g.target
+    return open
       ? { allowed: true, reason: 'Target reached · unlocked' }
-      : { allowed: false, reason: `Locked until you reach ${ghs(g.target, 0)} · ${ghs(g.target - g.saved, 0)} to go` }
+      : { allowed: false, reason: `Locked until you reach ${ghs(g.target, 0)} · ${ghs(Math.max(0, g.target - g.saved), 0)} to go` }
   }
-  const days = daysUntil(g.unlockDate!)
-  return days <= 0
-    ? { allowed: true, reason: 'Lock period over · unlocked' }
-    : { allowed: false, reason: `Locked until ${shortDate(g.unlockDate!)} · ${days} day${days === 1 ? '' : 's'} left` }
+  const days = g.unlockDate ? daysUntil(g.unlockDate) : 0
+  const open = g.lock ? !g.lock.locked : days <= 0
+  if (open) return { allowed: true, reason: 'Lock period over · unlocked' }
+  return g.unlockDate
+    ? { allowed: false, reason: `Locked until ${shortDate(g.unlockDate)} · ${days} day${days === 1 ? '' : 's'} left` }
+    : { allowed: false, reason: g.lock?.message || 'Locked until the end date' }
 }
 
 const active = (c: Circle) => c.members.filter((m) => m.status === 'active')
@@ -318,13 +226,6 @@ export type Notice = {
  * Hidden for now; set to true to bring it back everywhere.
  */
 export const SHOW_PARTNER_SIDE = false
-
-export const NOTICES: Notice[] = [
-  { id: 'n4', kind: 'saveme', text: 'Kwesi asked you for a Save Me rescue of GHS 300', date: '2026-11-11', read: false, link: '/adawise/requests/sm-kwesi' },
-  { id: 'n3', kind: 'invite', text: 'Abena invited you to support her Wedding goal', date: '2026-11-10', read: false, link: '/adawise/requests/inv-abena' },
-  { id: 'n2', kind: 'circle', text: 'Kofi passed the halfway mark in Hostel fund', date: '2026-11-04', read: true, link: '/adawise/circle/hostel' },
-  { id: 'n1', kind: 'milestone', text: 'New laptop hit its 6-month milestone: GHS 60 interest paid upfront', date: '2026-10-20', read: true, link: '/adawise/goal/laptop' },
-]
 
 /** Save Me terms a partner accepts (from the Adawise product doc) */
 export const SAVE_ME_TERMS = [

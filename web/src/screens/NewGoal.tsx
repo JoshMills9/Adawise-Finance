@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import { ClockIcon, DropletIcon, LockIcon, UsersIcon } from '../components/icons'
 import { GOAL_TYPE_LABEL, MAX_PARTNERS, ghs, type Frequency, type Goal, type GoalType } from '../lib/demoData'
-import { goalStore } from '../lib/goalStore'
+import { useToast } from '../components/ui'
+import { contributeToGoal, createGoal, errorText, invitePartner } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
 import {
@@ -27,7 +28,7 @@ import {
   goBack,
   type Icon,
 } from '../components/ada'
-import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, iso, longDate, nextDue, todayIso, uid } from '../lib/format'
+import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, iso, longDate, todayIso } from '../lib/format'
 
 const STEPS = ['Goal', 'Type', 'Plan', 'Partner', 'Review'] as const
 const DEMO_WALLET = '241 234 567'
@@ -96,6 +97,10 @@ export function NewGoal() {
   const [dir, setDir] = useState(1)
   const [paying, setPaying] = useState(false)
   const [created, setCreated] = useState<Goal | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [toast, toastNode] = useToast()
+  // Set once the goal exists on the server, so a retried first deposit doesn't create it twice
+  const saved = useRef<Goal | null>(null)
   const [d, setD] = useState<Draft>({
     icon: 'target',
     name: '',
@@ -131,25 +136,38 @@ export function NewGoal() {
   }
   const back = () => (step === 0 ? exit() : go(step - 1))
 
-  const create = () => {
-    const goal: Goal = {
-      id: `goal-${Date.now()}`,
+  /** Creates the goal and sends partner invites (once); returns the goal as the app shows it */
+  const createOnServer = async (): Promise<Goal> => {
+    if (saved.current) return saved.current
+    const g = await createGoal({
       name: d.name.trim(),
       icon: d.icon,
       type: d.type!,
-      saved: deposit,
       target,
-      createdAt: todayIso(),
-      activity: deposit > 0 ? [{ id: uid('a'), kind: 'deposit', amount: deposit, date: todayIso(), note: 'First deposit' }] : [],
-      unlockDate: d.type === 'time-locked' ? iso(addMonths(d.months)) : undefined,
-      partners: d.partners.length
-        ? d.partners.map((p) => ({ name: firstName(p.name), initials: initials(p.name), role: p.role!, status: 'invited' as const }))
-        : undefined,
-      nextContribution: { amount: perPeriod, due: nextDue(d.frequency) },
-      plan: { frequency: d.frequency, months: d.months, amount: perPeriod, autoSave: d.autoSave, reminders: d.reminders },
+      endDate: d.type === 'time-locked' ? iso(addMonths(d.months)) : undefined,
+      plan: { frequency: d.frequency, months: d.months, amount: perPeriod, autoSave: d.autoSave, reminders: d.reminders, startDate: todayIso() },
+    })
+    const results = await Promise.allSettled(d.partners.map((p) => invitePartner(g.id, p.phone)))
+    const failed = d.partners.filter((_, i) => results[i]!.status === 'rejected').map((p) => firstName(p.name))
+    if (failed.length) toast(`Couldn't invite ${failed.join(' and ')}. Try again from the goal.`)
+    // Keep the invites as picked here (with their roles) for the success screen
+    const invited = d.partners
+      .filter((p) => !failed.includes(firstName(p.name)))
+      .map((p) => ({ name: firstName(p.name), initials: initials(p.name), role: p.role!, status: 'invited' as const }))
+    saved.current = { ...g, partners: invited.length ? invited : g.partners }
+    return saved.current
+  }
+
+  /** No first deposit: just create */
+  const create = async () => {
+    setBusy(true)
+    try {
+      setCreated(await createOnServer())
+    } catch (e) {
+      toast(errorText(e))
+    } finally {
+      setBusy(false)
     }
-    goalStore.add(goal)
-    setCreated(goal)
   }
 
   if (created) return <Success goal={created} deposit={deposit} onDone={exit} />
@@ -194,14 +212,14 @@ export function NewGoal() {
       {/* Footer actions */}
       <div className="shrink-0 border-t border-[#e6ebec] bg-white px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
         <PrimaryButton
-          disabled={!valid}
+          disabled={!valid || busy}
           onClick={() => {
             if (step < STEPS.length - 1) go(step + 1)
             else if (deposit > 0) setPaying(true)
-            else create()
+            else void create()
           }}
         >
-          {step === STEPS.length - 1 ? (deposit > 0 ? `Create goal & pay ${ghs(deposit)}` : 'Create goal') : 'Continue'}
+          {busy ? 'Creating goal…' : step === STEPS.length - 1 ? (deposit > 0 ? `Create goal & pay ${ghs(deposit)}` : 'Create goal') : 'Continue'}
         </PrimaryButton>
         {step === 3 && (
           <button
@@ -221,12 +239,17 @@ export function NewGoal() {
         open={paying}
         amount={deposit}
         goalName={d.name.trim()}
+        run={async (amt) => {
+          const g = await createOnServer()
+          await contributeToGoal(g.id, amt)
+        }}
         onCancel={() => setPaying(false)}
         onApproved={() => {
           setPaying(false)
-          create()
+          if (saved.current) setCreated({ ...saved.current, saved: deposit })
         }}
       />
+      {toastNode}
     </div>
   )
 }

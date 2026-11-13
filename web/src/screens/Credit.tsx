@@ -207,7 +207,7 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
               hint={
                 tooMuch
                   ? from === 'wallet' && walletBalance < left
-                    ? `Your loan balance is ${ghs(walletBalance)}`
+                    ? `Your Adawise wallet has ${ghs(walletBalance)}`
                     : `You only owe ${ghs(left)}`
                   : amount > 0 && amount < left
                     ? `${ghs(left - amount)} will be left after this`
@@ -219,7 +219,7 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
           <p className="mt-5 text-[14px] font-semibold text-ada-dark">Pay from</p>
           <div className="mt-2 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] border border-[#e6ebec]">
             <SourceRow on={from === 'momo'} title="MoMo wallet" sub={DEMO_WALLET} onClick={() => setFrom('momo')} />
-            {walletBalance > 0 && <SourceRow on={from === 'wallet'} title="Loan balance" sub={`${ghs(walletBalance)} unspent in your Adawise wallet`} onClick={() => setFrom('wallet')} />}
+            {walletBalance > 0 && <SourceRow on={from === 'wallet'} title="Adawise wallet" sub={`${ghs(walletBalance)} available`} onClick={() => setFrom('wallet')} />}
           </div>
 
           <div className="mt-5">
@@ -236,7 +236,7 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
           <p className="mt-1 text-center text-[32px] font-bold text-ada-dark">{ghs(amount)}</p>
           <div className="mt-5 divide-y divide-[#eef0f1] rounded-[14px] bg-[#f4f6f7] text-[14px]">
             <SheetRow label="Loan" value={goal.name} />
-            <SheetRow label="From" value={from === 'momo' ? `MoMo wallet ${DEMO_WALLET}` : 'Adawise loan balance'} />
+            <SheetRow label="From" value={from === 'momo' ? `MoMo wallet ${DEMO_WALLET}` : 'Adawise wallet'} />
             <SheetRow label="Left after" value={ghs(Math.max(0, left - amount))} />
           </div>
           <p className="mt-3 text-center text-[12.5px] text-muted">Demo only. No real money moves and no PIN is needed.</p>
@@ -249,7 +249,7 @@ function RepaySheet({ goal, walletBalance, onClose, onDone }: { goal: Active | n
         </>
       )}
 
-      {stage === 'processing' && <Processing title="Processing…" subtitle={from === 'momo' ? 'Waiting for MoMo confirmation' : 'Applying your loan balance'} />}
+      {stage === 'processing' && <Processing title="Processing…" subtitle={from === 'momo' ? 'Waiting for MoMo confirmation' : 'Paying from your Adawise wallet'} />}
     </Sheet>
   )
 }
