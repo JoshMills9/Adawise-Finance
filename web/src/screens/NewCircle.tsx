@@ -245,6 +245,7 @@ export function NewCircle() {
                     defaultOpen={contacts.length === 0}
                     taken={d.members.map((m) => m.phone)}
                     action="Add member"
+                    fromPhone
                     onAdd={(c) => !isMember(c.phone) && set({ members: [...d.members, c] })}
                   />
                 )}

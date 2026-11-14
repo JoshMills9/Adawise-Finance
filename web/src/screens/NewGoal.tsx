@@ -438,7 +438,7 @@ function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void })
           })}
         </div>
       )}
-      {!full && <AddContact key={contacts.length === 0 ? 'first' : 'more'} defaultOpen={contacts.length === 0} taken={list.map((p) => p.phone)} action="Add partner" onAdd={add} />}
+      {!full && <AddContact key={contacts.length === 0 ? 'first' : 'more'} defaultOpen={contacts.length === 0} taken={list.map((p) => p.phone)} action="Add partner" fromPhone onAdd={add} />}
       {full && <p className="mt-2 text-[12.5px] text-muted">You've added the maximum of {MAX_PARTNERS} partners. Remove one to choose someone else.</p>}
 
       {list.length > 0 && (
