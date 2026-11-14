@@ -22,7 +22,7 @@ export function useToast() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
-          className="pointer-events-none absolute inset-x-0 bottom-[calc(110px+env(safe-area-inset-bottom))] z-30 flex justify-center px-6"
+          className="pointer-events-none absolute inset-x-0 bottom-[calc(110px+env(safe-area-inset-bottom))] z-[60] flex justify-center px-6"
         >
           <span className="rounded-full bg-[#2b2b2b]/90 px-5 py-3 text-center text-[14px] text-white shadow-lg">{message}</span>
         </motion.div>

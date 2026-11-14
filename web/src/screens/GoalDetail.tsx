@@ -741,14 +741,16 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
     setBusy(true)
     try {
       await invitePartner(goal.id, person, role)
-      await refreshGoal(goal.id)
-      onToast(`Invite sent to ${name}`)
-      close()
     } catch (e) {
       onToast(errorText(e))
-    } finally {
       setBusy(false)
+      return
     }
+    // The invite is sent; a failed refresh shouldn't make it look like it wasn't (sending again would fail as a duplicate)
+    void refreshGoal(goal.id).catch(() => undefined)
+    onToast(`Invite sent to ${name}`)
+    setBusy(false)
+    close()
   }
 
   return (
@@ -771,7 +773,7 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
           ))}
         </div>
       )}
-      <AddContact key={open && options.length === 0 ? 'first' : 'more'} defaultOpen={options.length === 0} action="Choose" onAdd={(c) => setWho(c.phone)} />
+      <AddContact key={open && options.length === 0 ? 'first' : 'more'} defaultOpen={options.length === 0} action="Choose" fromPhone onAdd={(c) => setWho(c.phone)} />
       {person && (
         <>
           <p className="mt-5 text-[14px] font-semibold text-ada-dark">How will {firstName(person.name)} take part?</p>
