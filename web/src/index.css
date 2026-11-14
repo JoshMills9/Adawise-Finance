@@ -58,6 +58,9 @@
 
 .font-ada {
   font-weight: 400;
+  /* Adawise text and icons use a slate ink; the MoMo screens keep the original */
+  --color-ink: #1e2937;
+  color: var(--color-ink);
 }
 
 /* Adawise headers and dark cards */

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../components/ui'
-import { PlusIcon, UsersIcon } from '../components/icons'
-import { ACTIVITY_LIMIT, ADA_DARK, Avatar, Check, ConfirmSheet, DangerLink, DetailHeader, EmptyState, MoneySheet, PrimaryButton, Processing, Progress, Ring, SectionTitle, Sheet, ShowAllToggle, Tag, card, goBack } from '../components/ada'
+import { ChevronRight, PlusIcon, UsersIcon } from '../components/icons'
+import { ACTIVITY_LIMIT, ADA_DARK, Avatar, Check, ConfirmSheet, DangerLink, DetailHeader, EmptyState, Field, MoneySheet, PrimaryButton, Processing, Progress, Ring, SectionTitle, Sheet, ShowAllToggle, Tag, ToggleRow, card, goBack } from '../components/ada'
 import { MAX_CIRCLE_MEMBERS, circleProgress, ghs, memberPct, shortDate, type Circle } from '../lib/demoData'
 import { addMonths, contribution, firstName, initials, localPhone, longDate, perLabel } from '../lib/format'
 import { circleStore, useCircle, useContacts } from '../lib/goalStore'
 import { ApiError } from '../lib/api'
-import { contributeToCircle, errorText, inviteToCircle, leaveCircle, refreshCircle } from '../lib/adawise'
+import { contributeToCircle, errorText, inviteToCircle, leaveCircle, refreshCircle, updateCircle } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph, TrophyIcon } from '../components/goalIcons'
 import { AddContact } from '../components/contacts'
@@ -23,6 +23,7 @@ export function CircleDetail() {
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [loading, setLoading] = useState(true)
   const [leaving, setLeaving] = useState(false)
+  const [renaming, setRenaming] = useState(false)
   const back = () => goBack(navigate)
 
   // Fresh members and progress from the API every time the circle opens
@@ -197,6 +198,32 @@ export function CircleDetail() {
             </ul>
           </div>
 
+          {/* Only the owner can change these (the API refuses anyone else) */}
+          {circle.isOwner && (
+            <>
+              <SectionTitle title="Circle settings" />
+              <div className={`${card} divide-y divide-[#eef0f1] overflow-hidden`}>
+                <button type="button" onClick={() => setRenaming(true)} className="flex w-full items-center gap-3 px-4 py-[14px] text-left active:bg-[#f7f9f9]">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold text-ink">Circle name</span>
+                    <span className="block truncate text-[13px] text-muted">{circle.name}</span>
+                  </span>
+                  <ChevronRight size={18} className="shrink-0 text-muted" />
+                </button>
+                <ToggleRow
+                  title="Show amounts to members"
+                  desc={circle.showAmounts ? 'Members see how much each person has saved' : 'Members only see each other’s % progress'}
+                  on={circle.showAmounts}
+                  onChange={(v) =>
+                    void updateCircle(circle.id, { showAmounts: v })
+                      .then(() => toast(v ? 'Members can now see amounts' : 'Members now only see % progress'))
+                      .catch((e) => toast(errorText(e)))
+                  }
+                />
+              </div>
+            </>
+          )}
+
           {/* Activity */}
           <SectionTitle title="Activity" />
           <div className={`${card} overflow-hidden`}>
@@ -245,6 +272,7 @@ export function CircleDetail() {
         onDone={() => navigate('/adawise/circles', { replace: true })}
       />
       <InviteSheet open={inviting} circle={circle} onClose={() => setInviting(false)} onToast={toast} />
+      <RenameSheet open={renaming} circle={circle} onClose={() => setRenaming(false)} onToast={toast} />
       {toastNode}
     </div>
   )
@@ -323,11 +351,50 @@ function InviteSheet({ open, circle, onClose, onToast }: { open: boolean; circle
         disabled={picked.length >= room}
         taken={picked}
         action="Add"
+        fromPhone
         onAdd={(c) => setPicked((p) => (p.includes(c.phone) ? p : [...p, c.phone]))}
       />
       <div className="mt-5">
         <PrimaryButton disabled={!picked.length || busy} onClick={() => void send()}>
           {busy ? 'Sending invites…' : picked.length ? `Invite ${picked.length}` : 'Choose people'}
+        </PrimaryButton>
+      </div>
+    </Sheet>
+  )
+}
+
+function RenameSheet({ open, circle, onClose, onToast }: { open: boolean; circle: Circle; onClose: () => void; onToast: (m: string) => void }) {
+  const [name, setName] = useState(circle.name)
+  const [busy, setBusy] = useState(false)
+  // Start from the current name each time the sheet opens
+  useEffect(() => {
+    if (open) setName(circle.name)
+  }, [open, circle.name])
+  const trimmed = name.trim()
+  const ok = trimmed.length >= 2 && trimmed !== circle.name && !busy
+  const save = async () => {
+    if (!ok) return
+    setBusy(true)
+    try {
+      await updateCircle(circle.id, { name: trimmed })
+      onToast('Circle renamed')
+      onClose()
+    } catch (e) {
+      onToast(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Sheet open={open} onClose={onClose} label="Rename circle">
+      <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Rename circle</h2>
+      <p className="mt-1 text-[14px] text-muted">Everyone in the circle sees the new name.</p>
+      <div className="mt-4">
+        <Field label="Circle name" autoComplete="off" value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} />
+      </div>
+      <div className="mt-5">
+        <PrimaryButton disabled={!ok} onClick={() => void save()}>
+          {busy ? 'Saving…' : 'Save name'}
         </PrimaryButton>
       </div>
     </Sheet>

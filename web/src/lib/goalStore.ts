@@ -171,6 +171,16 @@ export const circleStore = {
   reset: circles.reset,
 }
 export const useCircles = () => circles.useValue()
+
+/** Circles other people have invited you to (pending only) */
+export type CircleInvite = { id: string; circleName: string; icon: string; target: number; ownerName: string }
+const circleInvites = createStore<CircleInvite[]>('adawise.api.circleInvites', [])
+export const circleInviteStore = {
+  replaceAll: (list: CircleInvite[]) => circleInvites.set(list),
+  remove: (id: string) => circleInvites.set(circleInvites.get().filter((i) => i.id !== id)),
+  reset: circleInvites.reset,
+}
+export const useCircleInvites = () => circleInvites.useValue()
 export const useCircle = (id: string | undefined) => useCircles().find((c) => c.id === id)
 
 /* ---------- Save Me allowance (3 successful rescues per calendar year) ---------- */
@@ -292,6 +302,7 @@ export function signOutAdawise() {
   goalStore.reset()
   walletStore.reset()
   circleStore.reset()
+  circleInviteStore.reset()
   noticeStore.reset()
   saveMeStore.reset()
   badgeStore.reset()

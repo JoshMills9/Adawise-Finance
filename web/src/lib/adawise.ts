@@ -3,7 +3,7 @@
 import { api, ApiError, auth, fromMoney, list, toMoney, waitForPayment, type ApiUser, type PaymentAttempt } from './api'
 import { type Activity, type Circle, type Frequency, type Goal, type GoalType, type Notice, type Partner } from './demoData'
 import { firstName, initials, iso, toE164 } from './format'
-import { badgeStore, circleStore, contactStore, goalStore, noticeStore, profileStore, saveMeStore, walletStore, type WalletEntry } from './goalStore'
+import { badgeStore, circleInviteStore, circleStore, contactStore, goalStore, noticeStore, profileStore, saveMeStore, walletStore, type WalletEntry } from './goalStore'
 
 /* ---------- API shapes (only the fields the app reads) ---------- */
 
@@ -245,7 +245,7 @@ export async function refreshWallet() {
 
 /** Everything the Adawise home and tabs show. One failing area doesn't stop the others. */
 export async function refreshAdawise() {
-  const results = await Promise.allSettled([refreshGoals(), refreshWallet(), refreshCircles(), refreshNotices(), refreshSaveMe(), refreshBadges(), refreshProfile()])
+  const results = await Promise.allSettled([refreshGoals(), refreshWallet(), refreshCircles(), refreshCircleInvites(), refreshNotices(), refreshSaveMe(), refreshBadges(), refreshProfile()])
   const failed = results.find((r) => r.status === 'rejected')
   if (failed) throw failed.reason
 }
@@ -266,10 +266,13 @@ function noticeKind(k: string): Notice['kind'] {
 function toNotice(n: ApiNotification): Notice {
   const d = n.data ?? {}
   // Requests made of *you* (invites, Save Me asks) belong to the partner side
-  const forMe = n.kind === 'partner_invited' || n.kind === 'saveme_requested' || n.kind === 'circle_invited'
-  const link = forMe
-    ? '/adawise/requests'
-    : typeof d.circle_id === 'string'
+  const forMe = n.kind === 'partner_invited' || n.kind === 'saveme_requested'
+  const link =
+    n.kind === 'circle_invited'
+      ? '/adawise' // circle invites are answered on the Adawise home screen
+      : forMe
+        ? '/adawise/requests'
+        : typeof d.circle_id === 'string'
       ? `/adawise/circle/${d.circle_id}`
       : typeof d.goal_id === 'string'
         ? `/adawise/goal/${d.goal_id}`
@@ -436,9 +439,63 @@ export async function createCircle(input: NewCircleInput): Promise<Circle> {
   return circle
 }
 
+/** Owner only (403 otherwise): rename the circle or change whether members see amounts. Optimistic. */
+export async function updateCircle(id: string, patch: { name?: string; showAmounts?: boolean }) {
+  const before = circleStore.all().find((c) => c.id === id)
+  if (before) {
+    circleStore.upsert({
+      ...before,
+      ...(patch.name !== undefined && { name: patch.name.trim() }),
+      ...(patch.showAmounts !== undefined && { showAmounts: patch.showAmounts }),
+    })
+  }
+  try {
+    const c = await api.patch<ApiCircle>(`/circles/${id}/`, { name: patch.name?.trim(), show_amounts: patch.showAmounts })
+    circleStore.upsert(toCircle(c, undefined, circleStore.all().find((x) => x.id === id)))
+  } catch (e) {
+    if (before) circleStore.upsert(before)
+    throw e
+  }
+}
+
+/* ---------- circle invites sent to you ---------- */
+
+type ApiCircleInvite = { id: string; circle_name: string; circle_category: string; target: string; owner_name: string; status?: string }
+
+export async function refreshCircleInvites() {
+  const rows = await list<ApiCircleInvite>('/circle-invites/', {}, 1)
+  circleInviteStore.replaceAll(
+    rows
+      .filter((r) => !r.status || r.status === 'invited')
+      .map((r) => ({
+        id: r.id,
+        circleName: r.circle_name,
+        icon: CATEGORY_ICON[r.circle_category as ApiCategory] ?? 'group',
+        target: fromMoney(r.target),
+        ownerName: r.owner_name,
+      })),
+  )
+}
+
+/** Joins the circle; the API makes you a goal in it */
+export async function acceptCircleInvite(inviteId: string): Promise<Circle> {
+  const c = await api.post<ApiCircle>(`/circle-invites/${inviteId}/accept/`)
+  circleInviteStore.remove(inviteId)
+  const circle = toCircle(c, new Date().toISOString())
+  circleStore.upsert(circle)
+  void refreshGoals().catch(() => undefined)
+  return circle
+}
+
+export async function declineCircleInvite(inviteId: string) {
+  await api.post(`/circle-invites/${inviteId}/decline/`)
+  circleInviteStore.remove(inviteId)
+}
+
 export async function inviteToCircle(circleId: string, people: Person[]) {
   await api.post(`/circles/${circleId}/members/`, { members: toNamed(people) })
-  await refreshCircle(circleId)
+  // They're added; a failed refresh shouldn't make it look like they weren't
+  await refreshCircle(circleId).catch(() => undefined)
 }
 
 /** Adding money to a circle pays into your own goal in it */

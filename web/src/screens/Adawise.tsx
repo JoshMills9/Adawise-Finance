@@ -33,6 +33,7 @@ import {
 } from '../lib/demoData'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
+import { CircleInvites } from '../components/circleInvites'
 import { ACTIVITY_LIMIT, EmptyState, HeartIcon, MoneySheet, Radio, Sheet, PrimaryButton, ShowAllToggle } from '../components/ada'
 import { AdaTabBar, TAB_BAR_SPACE } from './AdaTabs'
 import { contributeToGoal, depositToWallet, errorText, refreshAdawise, withdrawFromGoal, withdrawFromWallet } from '../lib/adawise'
@@ -168,6 +169,9 @@ export function Adawise() {
           <QuickAction icon={FlagIcon} title="Create goal" subtitle="On your own" onClick={() => navigate("/adawise/new-goal")} />
           <QuickAction icon={UsersIcon} title="Create circle" subtitle="With others" onClick={() => navigate("/adawise/new-circle")} />
         </section>
+
+        {/* ---- Circle invites waiting for an answer ---- */}
+        <CircleInvites />
 
         {/* ---- Requests for you (invites + Save Me asks from people you support) ---- */}
         {SHOW_PARTNER_SIDE && (

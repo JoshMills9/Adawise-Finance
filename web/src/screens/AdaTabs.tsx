@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ADA_DARK, Chip, DEMO_NAME, DEMO_WALLET, EmptyState, card } from '../components/ada'
 import { ChevronRight, FlagIcon, HomeIcon, PlusIcon, ProfileIcon, SearchIcon, UsersIcon } from '../components/icons'
 import { GOAL_TYPE_LABEL, SHOW_PARTNER_SIDE, creditLeft, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
-import { useBadges, useCircles, useGoals, useProfile, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
+import { signOutAdawise, useBadges, useCircles, useGoals, useProfile, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
 import { auth } from '../lib/api'
 import { refreshAdawise } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
@@ -316,7 +316,14 @@ export function ProfileTab() {
 
       <section className="mx-4 mt-4 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
         <Row label="Save Me" note={`${saveMe.left} of ${saveMe.allowed} left this year`} />
-        <Row label="Back to MoMo" onClick={() => navigate('/home', { replace: true })} />
+        <Row
+          label="Back to MoMo"
+          onClick={() => {
+            // Leaving Adawise signs out of it: the token is revoked and cached Adawise data dropped
+            navigate('/home', { replace: true })
+            signOutAdawise()
+          }}
+        />
       </section>
     </TabScreen>
   )
