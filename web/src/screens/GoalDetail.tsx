@@ -30,7 +30,6 @@ import {
   type Icon,
 } from '../components/ada'
 import {
-  CONTACTS,
   CREDIT,
   creditLeft,
   GOAL_TYPE_LABEL,
@@ -44,8 +43,9 @@ import {
   type Goal,
   type Partner,
 } from '../lib/demoData'
-import { addMonths, amountOf, cleanAmount, firstName, initials, iso, longDate, perLabel } from '../lib/format'
-import { goalStore, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
+import { addMonths, amountOf, cleanAmount, firstName, initials, iso, localPhone, longDate, perLabel } from '../lib/format'
+import { goalStore, useContacts, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
+import { AddContact } from '../components/contacts'
 import { ApiError } from '../lib/api'
 import { removePartner, withdrawAllAndClose, askPartner, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
@@ -720,10 +720,13 @@ function ArrowUpIcon({ size = 22 }: { size?: number }) {
 /* ---------- add a partner to an existing goal ---------- */
 
 function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal: Goal; onClose: () => void; onToast: (m: string) => void }) {
+  // The chosen contact's phone number
   const [who, setWho] = useState<string>('')
   const [role, setRole] = useState<'saver' | 'supporter' | null>(null)
+  const contacts = useContacts()
   const taken = new Set((goal.partners ?? []).map((p) => p.name))
-  const options = CONTACTS.filter((c) => !taken.has(firstName(c.name)))
+  const options = contacts.filter((c) => !taken.has(firstName(c.name)))
+  const person = contacts.find((c) => c.phone === who)
   const close = () => {
     onClose()
     setTimeout(() => {
@@ -733,13 +736,11 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
   }
   const [busy, setBusy] = useState(false)
   const send = async () => {
-    const name = firstName(who)
-    const phone = CONTACTS.find((c) => c.name === who)?.phone
-    if (!phone) return
+    if (!person || !role) return
+    const name = firstName(person.name)
     setBusy(true)
     try {
-      // The API has no saver/supporter choice yet, so only the phone is sent
-      await invitePartner(goal.id, phone)
+      await invitePartner(goal.id, person, role)
       await refreshGoal(goal.id)
       onToast(`Invite sent to ${name}`)
       close()
@@ -756,21 +757,24 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
       <p className="mt-1 text-[14px] text-muted">
         {goal.partners?.length ?? 0} of {MAX_PARTNERS} partners on {goal.name}
       </p>
-      <div className={`${card} mt-4 divide-y divide-[#eef0f1]`}>
-        {options.map((c) => (
-          <button key={c.name} type="button" onClick={() => setWho(c.name)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
-            <Avatar initials={initials(c.name)} size={36} />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-ink">{c.name}</span>
-              <span className="block text-[12.5px] text-muted">{c.phone}</span>
-            </span>
-            <Radio on={who === c.name} />
-          </button>
-        ))}
-      </div>
-      {who && (
+      {options.length > 0 && (
+        <div className={`${card} mt-4 divide-y divide-[#eef0f1]`}>
+          {options.map((c) => (
+            <button key={c.phone} type="button" onClick={() => setWho(c.phone)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+              <Avatar initials={initials(c.name)} size={36} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-ink">{c.name}</span>
+                <span className="block text-[12.5px] text-muted">{localPhone(c.phone)}</span>
+              </span>
+              <Radio on={who === c.phone} />
+            </button>
+          ))}
+        </div>
+      )}
+      <AddContact key={open && options.length === 0 ? 'first' : 'more'} defaultOpen={options.length === 0} action="Choose" onAdd={(c) => setWho(c.phone)} />
+      {person && (
         <>
-          <p className="mt-5 text-[14px] font-semibold text-ada-dark">How will {firstName(who)} take part?</p>
+          <p className="mt-5 text-[14px] font-semibold text-ada-dark">How will {firstName(person.name)} take part?</p>
           <div className="mt-2 flex flex-col gap-3">
             <Option selected={role === 'saver'} onClick={() => setRole('saver')} icon={UsersIcon} title="Save with me" desc="They save towards their own goal alongside you in a WiseCircle." />
             <Option selected={role === 'supporter'} onClick={() => setRole('supporter')} icon={HeartIcon} title="Cheer me on" desc="They follow your progress, encourage you and can help through Save Me." />
@@ -778,8 +782,8 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
         </>
       )}
       <div className="mt-5">
-        <PrimaryButton disabled={!who || !role || busy} onClick={() => void send()}>
-          {busy ? 'Sending invite…' : `Send invite${who ? ` to ${firstName(who)}` : ''}`}
+        <PrimaryButton disabled={!person || !role || busy} onClick={() => void send()}>
+          {busy ? 'Sending invite…' : `Send invite${person ? ` to ${firstName(person.name)}` : ''}`}
         </PrimaryButton>
       </div>
     </Sheet>

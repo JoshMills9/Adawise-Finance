@@ -50,3 +50,18 @@ export const initials = (name: string) =>
     .join('') || 'P'
 
 export const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+
+/** "024 412 3456" / "24 412 3456" / "233244123456" → "+233244123456" */
+export function toE164(phone: string) {
+  const d = phone.replace(/\D/g, '')
+  return d.startsWith('233') ? `+${d}` : `+233${d.replace(/^0/, '')}`
+}
+
+/** True for a full Ghana mobile number (9 digits after +233 or the leading 0) */
+export const isPhone = (phone: string) => /^\+233\d{9}$/.test(toE164(phone))
+
+/** "+233244123456" → "024 412 3456", the way people write it */
+export function localPhone(phone: string) {
+  const d = toE164(phone).slice(4)
+  return d.length === 9 ? `0${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}` : phone
+}

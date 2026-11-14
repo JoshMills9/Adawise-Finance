@@ -25,12 +25,13 @@ import {
   goBack,
 } from '../components/ada'
 import { MAX_CIRCLE_MEMBERS, ghs, type Circle, type Frequency } from '../lib/demoData'
-import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, longDate, perLabel } from '../lib/format'
-import { circleStore } from '../lib/goalStore'
+import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, localPhone, longDate, perLabel, toE164 } from '../lib/format'
+import { circleStore, useContacts } from '../lib/goalStore'
 import { useToast } from '../components/ui'
 import { contributeToCircle, createCircle, errorText } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
+import { AddContact } from '../components/contacts'
 
 const STEPS = ['Circle', 'Goal', 'Members', 'Review'] as const
 
@@ -41,15 +42,6 @@ const IDEAS = [
   { icon: 'party', name: 'Celebration' },
   { icon: 'business', name: 'Business' },
   { icon: 'gift', name: 'Christmas' },
-]
-
-const CONTACTS = [
-  { name: 'Kofi Asante', phone: '024 412 3456' },
-  { name: 'Esi Boateng', phone: '020 198 7654' },
-  { name: 'Yaw Mensah', phone: '055 422 2333' },
-  { name: 'Akosua Owusu', phone: '027 744 4555' },
-  { name: 'Ama Darko', phone: '024 555 1212' },
-  { name: 'Kwame Ofori', phone: '050 333 9090' },
 ]
 
 type Draft = {
@@ -86,6 +78,9 @@ export function NewCircle() {
 
   const [busy, setBusy] = useState(false)
   const [toast, toastNode] = useToast()
+  const contacts = useContacts()
+  const isMember = (phone: string) => d.members.some((m) => toE164(m.phone) === toE164(phone))
+  const membersFull = d.members.length >= MAX_CIRCLE_MEMBERS - 1
   // Set once the circle exists on the server, so a retried first saving doesn't create it twice
   const saved = useRef<Circle | null>(null)
 
@@ -97,7 +92,7 @@ export function NewCircle() {
       target,
       months: d.months,
       frequency: d.frequency,
-      phones: d.members.map((m) => m.phone),
+      members: d.members,
       showAmounts: d.showAmounts,
     })
     circleStore.log(saved.current.id, `You created the circle and invited ${d.members.length}`)
@@ -217,31 +212,42 @@ export function NewCircle() {
               <>
                 <StepTitle title="Invite members" subtitle={`Add the people you'll save with. Up to ${MAX_CIRCLE_MEMBERS - 1} people besides you.`} />
                 <div className="mt-6 flex items-center justify-between">
-                  <p className="text-[14px] font-semibold text-ada-dark">Contacts</p>
+                  <p className="text-[14px] font-semibold text-ada-dark">{contacts.length ? 'Your contacts' : 'Add a member'}</p>
                   <span className="rounded-full bg-[#e6ebec] px-2 py-[2px] text-[12px] font-semibold text-muted">{d.members.length} invited</span>
                 </div>
-                <div className={`${card} mt-2 divide-y divide-[#eef0f1] overflow-hidden`}>
-                  {CONTACTS.map((c) => {
-                    const on = d.members.some((m) => m.name === c.name)
-                    const full = d.members.length >= MAX_CIRCLE_MEMBERS - 1 && !on
-                    return (
-                      <button
-                        key={c.name}
-                        type="button"
-                        disabled={full}
-                        onClick={() => set({ members: on ? d.members.filter((m) => m.name !== c.name) : [...d.members, c] })}
-                        className={`flex w-full items-center gap-3 px-4 py-3 text-left ${full ? 'opacity-40' : ''}`}
-                      >
-                        <Avatar initials={initials(c.name)} size={38} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[15px] font-semibold text-ink">{c.name}</span>
-                          <span className="block text-[13px] text-muted">{c.phone}</span>
-                        </span>
-                        <Check on={on} />
-                      </button>
-                    )
-                  })}
-                </div>
+                {contacts.length > 0 && (
+                  <div className={`${card} mt-2 divide-y divide-[#eef0f1] overflow-hidden`}>
+                    {contacts.map((c) => {
+                      const on = isMember(c.phone)
+                      const full = membersFull && !on
+                      return (
+                        <button
+                          key={c.phone}
+                          type="button"
+                          disabled={full}
+                          onClick={() => set({ members: on ? d.members.filter((m) => toE164(m.phone) !== c.phone) : [...d.members, c] })}
+                          className={`flex w-full items-center gap-3 px-4 py-3 text-left ${full ? 'opacity-40' : ''}`}
+                        >
+                          <Avatar initials={initials(c.name)} size={38} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[15px] font-semibold text-ink">{c.name}</span>
+                            <span className="block text-[13px] text-muted">{localPhone(c.phone)}</span>
+                          </span>
+                          <Check on={on} />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {!membersFull && (
+                  <AddContact
+                    key={contacts.length === 0 ? 'first' : 'more'}
+                    defaultOpen={contacts.length === 0}
+                    taken={d.members.map((m) => m.phone)}
+                    action="Add member"
+                    onAdd={(c) => !isMember(c.phone) && set({ members: [...d.members, c] })}
+                  />
+                )}
                 <div className={`${card} mt-4`}>
                   <ToggleRow
                     title="Show amounts to members"

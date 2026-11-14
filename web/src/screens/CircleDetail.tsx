@@ -3,13 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../components/ui'
 import { PlusIcon, UsersIcon } from '../components/icons'
 import { ACTIVITY_LIMIT, ADA_DARK, Avatar, Check, ConfirmSheet, DangerLink, DetailHeader, EmptyState, MoneySheet, PrimaryButton, Processing, Progress, Ring, SectionTitle, Sheet, ShowAllToggle, Tag, card, goBack } from '../components/ada'
-import { CONTACTS, MAX_CIRCLE_MEMBERS, circleProgress, ghs, memberPct, shortDate, type Circle } from '../lib/demoData'
-import { addMonths, contribution, firstName, initials, longDate, perLabel } from '../lib/format'
-import { circleStore, useCircle } from '../lib/goalStore'
+import { MAX_CIRCLE_MEMBERS, circleProgress, ghs, memberPct, shortDate, type Circle } from '../lib/demoData'
+import { addMonths, contribution, firstName, initials, localPhone, longDate, perLabel } from '../lib/format'
+import { circleStore, useCircle, useContacts } from '../lib/goalStore'
 import { ApiError } from '../lib/api'
 import { contributeToCircle, errorText, inviteToCircle, leaveCircle, refreshCircle } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph, TrophyIcon } from '../components/goalIcons'
+import { AddContact } from '../components/contacts'
 
 export function CircleDetail() {
   useThemeColor(ADA_DARK)
@@ -259,9 +260,11 @@ function Rule({ children }: { children: React.ReactNode }) {
 }
 
 function InviteSheet({ open, circle, onClose, onToast }: { open: boolean; circle: Circle; onClose: () => void; onToast: (m: string) => void }) {
+  // Picked by phone number (two contacts can share a name)
   const [picked, setPicked] = useState<string[]>([])
+  const contacts = useContacts()
   const taken = new Set(circle.members.map((m) => m.name))
-  const options = CONTACTS.filter((c) => !taken.has(firstName(c.name)))
+  const options = contacts.filter((c) => !taken.has(firstName(c.name)))
   const room = MAX_CIRCLE_MEMBERS - circle.members.length
   const close = () => {
     onClose()
@@ -269,11 +272,11 @@ function InviteSheet({ open, circle, onClose, onToast }: { open: boolean; circle
   }
   const [busy, setBusy] = useState(false)
   const send = async () => {
-    const phones = picked.map((n) => CONTACTS.find((c) => c.name === n)?.phone).filter((p): p is string => !!p)
+    const people = contacts.filter((c) => picked.includes(c.phone))
     setBusy(true)
     try {
-      await inviteToCircle(circle.id, phones)
-      const names = picked.map(firstName).join(', ')
+      await inviteToCircle(circle.id, people)
+      const names = people.map((p) => firstName(p.name)).join(', ')
       circleStore.log(circle.id, `You invited ${names}`)
       onToast(`Invites sent to ${names}`)
       close()
@@ -289,29 +292,39 @@ function InviteSheet({ open, circle, onClose, onToast }: { open: boolean; circle
       <p className="mt-1 text-[14px] text-muted">
         {room} spot{room === 1 ? '' : 's'} left in {circle.name}
       </p>
+      {options.length > 0 && (
       <div className={`${card} mt-4 divide-y divide-[#eef0f1]`}>
-        {options.length === 0 && <p className="px-4 py-6 text-center text-[14px] text-muted">All your contacts are already in this circle.</p>}
         {options.map((c) => {
-          const on = picked.includes(c.name)
+          const on = picked.includes(c.phone)
           const full = !on && picked.length >= room
           return (
             <button
-              key={c.name}
+              key={c.phone}
               type="button"
               disabled={full}
-              onClick={() => setPicked((p) => (on ? p.filter((x) => x !== c.name) : [...p, c.name]))}
+              onClick={() => setPicked((p) => (on ? p.filter((x) => x !== c.phone) : [...p, c.phone]))}
               className={`flex w-full items-center gap-3 px-4 py-3 text-left ${full ? 'opacity-40' : ''}`}
             >
               <Avatar initials={initials(c.name)} size={36} />
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold text-ink">{c.name}</span>
-                <span className="block text-[12.5px] text-muted">{c.phone}</span>
+                <span className="block text-[12.5px] text-muted">{localPhone(c.phone)}</span>
               </span>
               <Check on={on} />
             </button>
           )
         })}
       </div>
+      )}
+      {contacts.length > 0 && options.length === 0 && <p className="mt-4 text-center text-[14px] text-muted">All your saved contacts are already in this circle.</p>}
+      <AddContact
+        key={open && options.length === 0 ? 'first' : 'more'}
+        defaultOpen={options.length === 0}
+        disabled={picked.length >= room}
+        taken={picked}
+        action="Add"
+        onAdd={(c) => setPicked((p) => (p.includes(c.phone) ? p : [...p, c.phone]))}
+      />
       <div className="mt-5">
         <PrimaryButton disabled={!picked.length || busy} onClick={() => void send()}>
           {busy ? 'Sending invites…' : picked.length ? `Invite ${picked.length}` : 'Choose people'}

@@ -1,6 +1,14 @@
 # Adawise API: Corrections and Missing Endpoints
 
-13 Nov 2026
+13 Nov 2026 · status updated 14 Nov 2026
+
+**Update, 14 Nov.** The new spec and server fix 7 items: CORS (B1), the plan preview and facets docs (C1, C2), and partner roles, names and invite context (F1, F2, F3). Payment polling now checks the provider on each poll (B2). The app now sends `name` and `role` on partner invites and `members: [{name, phone}]` on circles. All other items are still open. Checked on the live server:
+
+- **B1:** preflight allows `http://localhost:5173` and `idempotency-key`. Add the Vercel domain too if it isn't there yet.
+- **C3, C9:** the spec still lists the six paginated lists as arrays, and the missing `Idempotency-Key` example is still the old shape. Validation `details` still come back as lists, and `message` is still "Validation failed.".
+- **F4:** `GoalDetail` still has no `end_date`.
+- **M6:** the owner still can't leave or end a circle.
+- **Watch out:** `member_phones` on `POST /circles/` is now silently ignored instead of rejected. An older client creates a circle that invites nobody. Rejecting unknown fields would make this fail loudly.
 
 The Adawise app is now wired to the API. Testing it against `https://adawise-momo-backend.onrender.com/api/v1` found one blocker (CORS), 9 places where the spec and the server disagree, 9 fields the app needs on existing endpoints, and 7 missing endpoints. Each item says what to change.
 
@@ -8,35 +16,35 @@ The Adawise app is now wired to the API. Testing it against `https://adawise-mom
 
 Start with the high-priority items: they block features the app already has.
 
-| # | Area | Issue | Priority |
-| --- | --- | --- | --- |
-| B1 | All endpoints | No CORS headers, so browsers can't call the API | High |
-| B2 | Payments | MoMo payments take up to ~2 minutes to settle | Medium |
-| C1 | Goals | `/goals/facets/` returns counts, not a plan preview | Low |
-| C2 | Plans | `/plans/preview/` parameters and response undocumented | Medium |
-| C3 | Lists | 6 lists documented as arrays are paginated | Medium |
-| C4 | Goals | Wallet contribution returns 201 + body, spec says 200 | Low |
-| C5 | Home | `/home/` response undocumented | Medium |
-| C6 | Save Me | `/saveme/status/` response undocumented | Low |
-| C7 | Partners, Circles | `/partnering/` and `/circles/facets/` responses undocumented | Low |
-| C8 | Goals, Circles | `partners`, `members`, `plan` typed as untyped objects | Medium |
-| C9 | Errors | Error messages are unhelpful and spec examples are wrong | Low |
-| F1 | Partners | No saver/supporter role on invites | High |
-| F2 | Partners, Circles | People not on Adawise come back as a phone number | Medium |
-| F3 | Partners | Partner invites don't say whose goal it is | High |
-| F4 | Goals | Goals have no `end_date` in responses | Medium |
-| F5 | Transactions | No auto-save marker or description | Low |
-| F6 | Withdrawals | Goal withdrawal records aren't linked | Medium |
-| F7 | Badges | No list of goals behind each badge | Low |
-| F8 | Circles | No `created_at` on detail; fixed categories | Low |
-| F9 | Save Me | Only one partner can be asked at a time | Low |
-| M1 | Loans | No loan endpoints at all | High |
-| M2 | Circles | No nudge endpoint | Medium |
-| M3 | Partners | No cheer endpoint | Medium |
-| M4 | Circles | No circle activity feed | Medium |
-| M5 | Save Me | No endpoint for a single Save Me request | Low |
-| M6 | Circles | The owner can't end or leave a circle | Medium |
-| M7 | Goals | No "withdraw everything and close" in one call | Low |
+| # | Area | Issue | Priority | Status |
+| --- | --- | --- | --- | --- |
+| B1 | All endpoints | No CORS headers, so browsers can't call the API | High | Fixed |
+| B2 | Payments | MoMo payments take up to ~2 minutes to settle | Medium | Improved |
+| C1 | Goals | `/goals/facets/` returns counts, not a plan preview | Low | Fixed |
+| C2 | Plans | `/plans/preview/` parameters and response undocumented | Medium | Fixed |
+| C3 | Lists | 6 lists documented as arrays are paginated | Medium | Open |
+| C4 | Goals | Wallet contribution returns 201 + body, spec says 200 | Low | Open |
+| C5 | Home | `/home/` response undocumented | Medium | Open |
+| C6 | Save Me | `/saveme/status/` response undocumented | Low | Open |
+| C7 | Partners, Circles | `/partnering/` and `/circles/facets/` responses undocumented | Low | Open |
+| C8 | Goals, Circles | `partners`, `members`, `plan` typed as untyped objects | Medium | Open |
+| C9 | Errors | Error messages are unhelpful and spec examples are wrong | Low | Open |
+| F1 | Partners | No saver/supporter role on invites | High | Fixed |
+| F2 | Partners, Circles | People not on Adawise come back as a phone number | Medium | Fixed |
+| F3 | Partners | Partner invites don't say whose goal it is | High | Fixed |
+| F4 | Goals | Goals have no `end_date` in responses | Medium | Open |
+| F5 | Transactions | No auto-save marker or description | Low | Open |
+| F6 | Withdrawals | Goal withdrawal records aren't linked | Medium | Open |
+| F7 | Badges | No list of goals behind each badge | Low | Open |
+| F8 | Circles | No `created_at` on detail; fixed categories | Low | Open |
+| F9 | Save Me | Only one partner can be asked at a time | Low | Open |
+| M1 | Loans | No loan endpoints at all | High | Open |
+| M2 | Circles | No nudge endpoint | Medium | Open |
+| M3 | Partners | No cheer endpoint | Medium | Open |
+| M4 | Circles | No circle activity feed | Medium | Open |
+| M5 | Save Me | No endpoint for a single Save Me request | Low | Open |
+| M6 | Circles | The owner can't end or leave a circle | Medium | Open |
+| M7 | Goals | No "withdraw everything and close" in one call | Low | Open |
 
 ## Blockers outside the spec
 
@@ -250,7 +258,7 @@ These are proposed contracts written from what the app's screens need. Names and
 The app lets a saver borrow against a goal's fixed deposit without breaking the goal. Today this runs on demo data: the loan money never reaches the wallet, and `profile.loan.owed` is always `"0.00"`. The app's demo rules: available once the goal passes its 3-month milestone, up to 80% of the fixed deposit, one active loan per goal, paid into the Adawise wallet, 6% fee, due in 3 months, repaid from MoMo or the wallet in parts.
 
 | Method | Path | Body | Returns |
-| --- | --- | --- | --- |
+| --- | --- | --- | --- | --- |
 | GET | `/goals/{id}/loan-offer/` | – | `LoanOffer` |
 | POST | `/goals/{id}/loans/` | `{"amount": "500.00"}` | 201 `Loan`; wallet gets a `loan_proceeds` record |
 | GET | `/loans/` | – | paginated `Loan` list; filter `status` |

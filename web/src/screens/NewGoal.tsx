@@ -7,6 +7,8 @@ import { useToast } from '../components/ui'
 import { contributeToGoal, createGoal, errorText, invitePartner } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
+import { AddContact } from '../components/contacts'
+import { useContacts } from '../lib/goalStore'
 import {
   ADA_DARK,
   Check,
@@ -28,7 +30,7 @@ import {
   goBack,
   type Icon,
 } from '../components/ada'
-import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, iso, longDate, todayIso } from '../lib/format'
+import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, iso, localPhone, longDate, toE164, todayIso } from '../lib/format'
 
 const STEPS = ['Goal', 'Type', 'Plan', 'Partner', 'Review'] as const
 const DEMO_WALLET = '241 234 567'
@@ -55,13 +57,6 @@ const SUGGESTIONS = [
   { icon: 'medical', name: 'Emergency' },
   { icon: 'business', name: 'Business' },
   { icon: 'travel', name: 'Travel' },
-]
-
-const CONTACTS = [
-  { name: 'Kofi Asante', phone: '024 412 3456' },
-  { name: 'Esi Boateng', phone: '020 198 7654' },
-  { name: 'Yaw Mensah', phone: '055 422 2333' },
-  { name: 'Akosua Owusu', phone: '027 744 4555' },
 ]
 
 const TYPES: { id: GoalType; icon: Icon; title: string; desc: string; rule: string }[] = [
@@ -147,7 +142,7 @@ export function NewGoal() {
       endDate: d.type === 'time-locked' ? iso(addMonths(d.months)) : undefined,
       plan: { frequency: d.frequency, months: d.months, amount: perPeriod, autoSave: d.autoSave, reminders: d.reminders, startDate: todayIso() },
     })
-    const results = await Promise.allSettled(d.partners.map((p) => invitePartner(g.id, p.phone)))
+    const results = await Promise.allSettled(d.partners.map((p) => invitePartner(g.id, p, p.role!)))
     const failed = d.partners.filter((_, i) => results[i]!.status === 'rejected').map((p) => firstName(p.name))
     if (failed.length) toast(`Couldn't invite ${failed.join(' and ')}. Try again from the goal.`)
     // Keep the invites as picked here (with their roles) for the success screen
@@ -377,9 +372,7 @@ function StepPlan({ d, set, perPeriod, per }: { d: Draft; set: (p: Partial<Draft
 }
 
 function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
-  const [manual, setManual] = useState(false)
-  const [manualName, setManualName] = useState('')
-  const [manualPhone, setManualPhone] = useState('')
+  const contacts = useContacts()
   const roleRef = useRef<HTMLDivElement>(null)
   const list = d.partners
   const full = list.length >= MAX_PARTNERS
@@ -399,20 +392,13 @@ function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void })
     prevCount.current = list.length
   }, [list.length])
 
-  const has = (name: string) => list.some((p) => p.name === name)
-  const toggle = (name: string, phone: string) =>
-    has(name) ? set({ partners: list.filter((p) => p.name !== name) }) : !full && set({ partners: [...list, { name, phone, role: null }] })
-  const update = (name: string, patch: Partial<DraftPartner>) =>
-    set({ partners: list.map((p) => (p.name === name ? { ...p, ...patch } : p)) })
-
-  const manualOk = manualName.trim().length > 0 && manualPhone.replace(/\D/g, '').length >= 9 && !has(manualName.trim()) && !full
-  const addManual = () => {
-    if (!manualOk) return
-    set({ partners: [...list, { name: manualName.trim(), phone: manualPhone, role: null }] })
-    setManualName('')
-    setManualPhone('')
-    setManual(false)
-  }
+  // Partners are told apart by phone number (two contacts can share a name)
+  const has = (phone: string) => list.some((p) => toE164(p.phone) === toE164(phone))
+  const add = (c: { name: string; phone: string }) => !full && !has(c.phone) && set({ partners: [...list, { ...c, role: null }] })
+  const remove = (phone: string) => set({ partners: list.filter((p) => toE164(p.phone) !== toE164(phone)) })
+  const toggle = (c: { name: string; phone: string }) => (has(c.phone) ? remove(c.phone) : add(c))
+  const update = (phone: string, patch: Partial<DraftPartner>) =>
+    set({ partners: list.map((p) => (toE164(p.phone) === toE164(phone) ? { ...p, ...patch } : p)) })
 
   return (
     <>
@@ -422,65 +408,38 @@ function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void })
       />
 
       <div className="mt-6 flex items-center justify-between">
-        <p className="text-[14px] font-semibold text-ada-dark">Choose contacts</p>
+        <p className="text-[14px] font-semibold text-ada-dark">{contacts.length ? 'Your contacts' : 'Add a partner'}</p>
         <span className={`rounded-full px-2 py-[2px] text-[12px] font-semibold ${full ? 'bg-ada text-white' : 'bg-[#e6ebec] text-muted'}`}>
           {list.length} of {MAX_PARTNERS} added
         </span>
       </div>
-      <div className="mt-2 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
-        {CONTACTS.map((c) => {
-          const on = has(c.name)
-          const blocked = full && !on
-          return (
-            <button
-              key={c.name}
-              type="button"
-              aria-pressed={on}
-              disabled={blocked}
-              onClick={() => toggle(c.name, c.phone)}
-              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${blocked ? 'opacity-40' : ''}`}
-            >
-              <span className="grid size-[38px] shrink-0 place-items-center rounded-full bg-ada-soft text-[13px] font-bold text-ada-dark">{initials(c.name)}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-ink">{c.name}</span>
-                <span className="block text-[13px] text-muted">{c.phone}</span>
-              </span>
-              <Check on={on} />
-            </button>
-          )
-        })}
-        <button
-          type="button"
-          disabled={full}
-          onClick={() => setManual((m) => !m)}
-          className="w-full px-4 py-3 text-left text-[14px] font-semibold text-ada disabled:text-[#a3adae]"
-        >
-          + Enter a number instead
-        </button>
-      </div>
-      {full && <p className="mt-2 text-[12.5px] text-muted">You've added the maximum of {MAX_PARTNERS} partners. Remove one to choose someone else.</p>}
-
-      {manual && !full && (
-        <div className="mt-3 flex flex-col gap-3 rounded-[16px] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
-          <Field label="Partner's name" placeholder="e.g. Ama" value={manualName} onChange={(e) => setManualName(e.target.value.slice(0, 30))} />
-          <Field
-            label="MoMo number"
-            placeholder="24 000 0000"
-            inputMode="tel"
-            prefix="+233"
-            value={manualPhone}
-            onChange={(e) => setManualPhone(e.target.value.replace(/[^\d ]/g, '').slice(0, 12))}
-          />
-          <button
-            type="button"
-            disabled={!manualOk}
-            onClick={addManual}
-            className="h-[46px] rounded-full border-2 border-ada text-[15px] font-semibold text-ada transition disabled:border-[#c5d0d1] disabled:text-[#a3adae]"
-          >
-            Add partner
-          </button>
+      {contacts.length > 0 && (
+        <div className="mt-2 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
+          {contacts.map((c) => {
+            const on = has(c.phone)
+            const blocked = full && !on
+            return (
+              <button
+                key={c.phone}
+                type="button"
+                aria-pressed={on}
+                disabled={blocked}
+                onClick={() => toggle(c)}
+                className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${blocked ? 'opacity-40' : ''}`}
+              >
+                <span className="grid size-[38px] shrink-0 place-items-center rounded-full bg-ada-soft text-[13px] font-bold text-ada-dark">{initials(c.name)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold text-ink">{c.name}</span>
+                  <span className="block text-[13px] text-muted">{localPhone(c.phone)}</span>
+                </span>
+                <Check on={on} />
+              </button>
+            )
+          })}
         </div>
       )}
+      {!full && <AddContact key={contacts.length === 0 ? 'first' : 'more'} defaultOpen={contacts.length === 0} taken={list.map((p) => p.phone)} action="Add partner" onAdd={add} />}
+      {full && <p className="mt-2 text-[12.5px] text-muted">You've added the maximum of {MAX_PARTNERS} partners. Remove one to choose someone else.</p>}
 
       {list.length > 0 && (
         <div ref={roleRef}>
@@ -489,7 +448,7 @@ function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void })
             <AnimatePresence initial={false}>
               {list.map((p) => (
                 <motion.div
-                  key={p.name}
+                  key={p.phone}
                   layout
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -500,12 +459,12 @@ function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void })
                     <span className="grid size-[36px] shrink-0 place-items-center rounded-full bg-ada-soft text-[12.5px] font-bold text-ada-dark">{initials(p.name)}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold text-ink">{p.name}</span>
-                      <span className="block text-[12.5px] text-muted">{p.phone}</span>
+                      <span className="block text-[12.5px] text-muted">{localPhone(p.phone)}</span>
                     </span>
                     <button
                       type="button"
                       aria-label={`Remove ${p.name}`}
-                      onClick={() => set({ partners: list.filter((x) => x.name !== p.name) })}
+                      onClick={() => remove(p.phone)}
                       className="grid size-8 place-items-center rounded-full text-muted active:bg-[#eef2f4]"
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -515,8 +474,8 @@ function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void })
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <RoleButton on={p.role === 'saver'} icon={UsersIcon} label="Save with me" onClick={() => update(p.name, { role: 'saver' })} />
-                    <RoleButton on={p.role === 'supporter'} icon={HeartIcon} label="Cheer me on" onClick={() => update(p.name, { role: 'supporter' })} />
+                    <RoleButton on={p.role === 'saver'} icon={UsersIcon} label="Save with me" onClick={() => update(p.phone, { role: 'saver' })} />
+                    <RoleButton on={p.role === 'supporter'} icon={HeartIcon} label="Cheer me on" onClick={() => update(p.phone, { role: 'supporter' })} />
                   </div>
                   <p className="mt-2 text-[12.5px] leading-snug text-muted">
                     {p.role === 'saver'

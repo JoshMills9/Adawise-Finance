@@ -1,13 +1,11 @@
 // App stores. Goals, wallet, circles, notifications, Save Me, badges and profile are filled from
-// the Adawise API (lib/adawise.ts) and cached; the partner side and loans are still demo data.
+// the Adawise API (lib/adawise.ts) and cached. The partner side (hidden) and loans are local only.
 import { useSyncExternalStore } from 'react'
 import {
   computeBadges,
   creditLeft,
-  REQUESTS,
   SAVE_ME,
   SHOW_PARTNER_SIDE,
-  SUPPORTING,
   type Activity,
   type Circle,
   type Goal,
@@ -15,8 +13,8 @@ import {
   type PartnerRequest,
   type SupportedGoal,
 } from "./demoData"
-import { iso, todayIso, uid } from './format'
-import { auth } from './api'
+import { iso, toE164, todayIso, uid } from './format'
+import { api, auth } from './api'
 
 function createStore<T>(key: string, seed: T, migrate?: (raw: unknown) => T) {
   const listeners = new Set<() => void>()
@@ -213,7 +211,7 @@ export const useUnreadCount = () => useNotices().filter((n) => !n.read).length
 
 /* ---------- requests sent to you (invites + Save Me) ---------- */
 
-const requests = createStore<PartnerRequest[]>('adawise.requests.v2', REQUESTS)
+const requests = createStore<PartnerRequest[]>('adawise.requests.v3', [])
 
 export const requestStore = {
   update: (id: string, patch: Partial<PartnerRequest>) =>
@@ -225,7 +223,7 @@ export const useRequest = (id: string | undefined) => useRequests().find((r) => 
 
 /* ---------- goals you support ---------- */
 
-const supporting = createStore<SupportedGoal[]>('adawise.supporting.v2', SUPPORTING)
+const supporting = createStore<SupportedGoal[]>('adawise.supporting.v3', [])
 
 export const supportStore = {
   add: (s: SupportedGoal) => supporting.set([s, ...supporting.get().filter((x) => x.id !== s.id)]),
@@ -264,8 +262,32 @@ const profileApi = createStore<Profile | null>('adawise.api.profile', null)
 export const profileStore = { replace: (p: Profile) => profileApi.set(p), reset: profileApi.reset }
 export const useProfile = () => profileApi.useValue()
 
+/* ---------- contacts the user has added (kept on this device, per signed-in user) ---------- */
+
+/** Phone is stored in E.164 (+233…) */
+export type Contact = { name: string; phone: string }
+const NO_CONTACTS: Contact[] = []
+const contacts = createStore<Record<string, Contact[]>>('adawise.contacts', {})
+const contactOwner = () => auth.user()?.user_id ?? 'guest'
+
+export const contactStore = {
+  all: () => contacts.get()[contactOwner()] ?? NO_CONTACTS,
+  find: (phone: string) => contactStore.all().find((c) => c.phone === toE164(phone)),
+  /** Adds someone (or renames them if the number is already saved); most recent first */
+  save(c: Contact): Contact {
+    const saved = { name: c.name.trim(), phone: toE164(c.phone) }
+    const rest = contactStore.all().filter((x) => x.phone !== saved.phone)
+    contacts.set({ ...contacts.get(), [contactOwner()]: [saved, ...rest] })
+    return saved
+  },
+  reset: contacts.reset,
+}
+export const useContacts = () => contacts.useValue()[contactOwner()] ?? NO_CONTACTS
+
 /** Ends the Adawise session and drops its cached data (MoMo log out) */
 export function signOutAdawise() {
+  // Revoke the token on the server too; the request takes the token before it's cleared below
+  if (auth.isSignedIn()) void api.post('/auth/logout').catch(() => undefined)
   auth.clear()
   goalStore.reset()
   walletStore.reset()
@@ -287,6 +309,7 @@ export function resetAdawise() {
   requestStore.reset()
   supportStore.reset()
   partnerProfile.reset()
+  contactStore.reset()
 }
 
 

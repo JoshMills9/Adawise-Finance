@@ -1,5 +1,5 @@
 // Adawise app types, rules and maths. Goals, circles, wallet and notifications come from the
-// Adawise API (lib/adawise.ts); the dummy data left here is the partner side, still hidden.
+// Adawise API (lib/adawise.ts).
 
 export type GoalType = 'flexible' | 'goal-locked' | 'time-locked'
 export type Frequency = 'daily' | 'weekly' | 'monthly'
@@ -55,9 +55,8 @@ export type Circle = {
 
 export const MAX_CIRCLE_MEMBERS = 10
 
-export const SAVE_ME = { used: 1, allowed: 3 }
-export const FIXED_DEPOSITS = 2000
-export const INTEREST_EARNED = 75
+/** Successful Save Me rescues allowed per calendar year (the API reports the live figure) */
+export const SAVE_ME = { allowed: 3 }
 export const MILESTONES = [3, 6, 9, 12]
 /** Demo terms for Save Me credit against a fixed deposit */
 export const CREDIT = { maxShare: 0.8, months: 3, feeRate: 0.06 }
@@ -122,15 +121,6 @@ export const circleProgress = (c: Circle) => {
 
 /* ---------- partner side: what other people ask of *you* ---------- */
 
-export const CONTACTS = [
-  { name: 'Kofi Asante', phone: '024 412 3456' },
-  { name: 'Esi Boateng', phone: '020 198 7654' },
-  { name: 'Yaw Mensah', phone: '055 422 2333' },
-  { name: 'Akosua Owusu', phone: '027 744 4555' },
-  { name: 'Ama Darko', phone: '024 555 1212' },
-  { name: 'Kwame Ofori', phone: '050 333 9090' },
-]
-
 type RequestBase = { id: string; from: string; initials: string; goalName: string; goalIcon: string; date: string }
 export type InviteRequest = RequestBase & {
   kind: 'invite'
@@ -165,52 +155,6 @@ export type SupportedGoal = {
   /** Their recent consistency, shown to partners */
   streak: string
 }
-
-export const REQUESTS: PartnerRequest[] = [
-  {
-    id: 'sm-kwesi',
-    kind: 'saveme',
-    from: 'Kwesi Appiah',
-    initials: 'KW',
-    goalName: 'School fees',
-    goalIcon: 'school',
-    amount: 300,
-    reason: 'School fees deadline moved forward',
-    theirUsed: 1,
-    supportedId: 'kwesi-school',
-    date: '2026-11-11',
-    status: 'pending',
-  },
-  {
-    id: 'inv-abena',
-    kind: 'invite',
-    from: 'Abena Kyei',
-    initials: 'AK',
-    goalName: 'Wedding',
-    goalIcon: 'ring',
-    goalType: 'goal-locked',
-    target: 8000,
-    saved: 2400,
-    role: 'supporter',
-    date: '2026-11-10',
-    status: 'pending',
-  },
-]
-
-export const SUPPORTING: SupportedGoal[] = [
-  {
-    id: 'kwesi-school',
-    person: 'Kwesi',
-    initials: 'KW',
-    goalName: 'School fees',
-    icon: 'school',
-    type: 'time-locked',
-    saved: 1800,
-    target: 2500,
-    role: 'supporter',
-    streak: 'Saved 7 of the last 8 weeks',
-  },
-]
 
 export type Notice = {
   id: string

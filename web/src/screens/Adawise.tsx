@@ -19,11 +19,9 @@ import {
   WalletIcon,
 } from '../components/icons'
 import {
-  FIXED_DEPOSITS,
   SHOW_PARTNER_SIDE,
 
   GOAL_TYPE_LABEL,
-  INTEREST_EARNED,
   circleProgress,
   ghs,
   shortDate,
@@ -217,14 +215,6 @@ export function Adawise() {
             value={`${saveMe.left} of ${saveMe.allowed}`}
             note="Resets 1 Jan"
             tone="from-[#12212f] to-[#2a4a63]"
-          />
-          <Highlight
-            icon={VaultIcon}
-            image="fixed-deposits"
-            label="Fixed deposits"
-            value={hidden ? 'GHS ****' : ghs(FIXED_DEPOSITS, 0)}
-            note={`Interest earned ${ghs(INTEREST_EARNED, 0)}`}
-            tone="from-[#0c1722] to-[#1f3a50]"
           />
           <Highlight icon={BadgeIcon} image="badges" label="WiseBadges" value={`${badges.filter((b) => b.earned).length} of ${badges.length}`} note="3, 6, 9 & 12-month milestones" tone="from-[#12212f] to-[#33566f]" onClick={() => navigate('/adawise/badges')} />
           <Highlight icon={UsersIcon} image="circles" label="Active circles" value={String(circles.length)} note="Growing" tone="from-[#12212f] to-[#264257]" />

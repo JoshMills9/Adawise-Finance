@@ -1,9 +1,9 @@
 // Adawise backend ↔ app: maps API payloads into the app's own types (so screens don't change)
 // and wraps the calls each screen makes. Results land in the stores in goalStore.ts.
 import { api, ApiError, auth, fromMoney, list, toMoney, waitForPayment, type ApiUser, type PaymentAttempt } from './api'
-import { CONTACTS, type Activity, type Circle, type Frequency, type Goal, type GoalType, type Notice, type Partner } from './demoData'
-import { firstName, initials, iso } from './format'
-import { badgeStore, circleStore, goalStore, noticeStore, profileStore, saveMeStore, walletStore, type WalletEntry } from './goalStore'
+import { type Activity, type Circle, type Frequency, type Goal, type GoalType, type Notice, type Partner } from './demoData'
+import { firstName, initials, iso, toE164 } from './format'
+import { badgeStore, circleStore, contactStore, goalStore, noticeStore, profileStore, saveMeStore, walletStore, type WalletEntry } from './goalStore'
 
 /* ---------- API shapes (only the fields the app reads) ---------- */
 
@@ -17,7 +17,15 @@ type ApiSchedule = {
   auto_save_enabled?: boolean
   reminders_enabled?: boolean
 }
-type ApiPartner = { id: string; first_name: string; initials: string; status: 'invited' | 'accepted' | 'declined' | 'removed'; relation: string }
+type ApiPartner = {
+  id: string
+  /** The saver's own label for this person (the name sent with the invite) */
+  name: string | null
+  first_name: string
+  initials: string
+  status: 'invited' | 'accepted' | 'declined' | 'removed'
+  role: 'saver' | 'supporter'
+}
 export type ApiGoal = {
   id: string
   name: string
@@ -65,15 +73,16 @@ function toPartners(raw: unknown[] | undefined): Partner[] | undefined {
     .map((p) => p as Partial<ApiPartner>)
     .filter((p) => p.status === 'invited' || p.status === 'accepted')
     .map<Partner>((p) => {
-      // Someone not on Adawise yet comes back as their phone number; show the contact's name instead
-      const contact = /^\+?\d{7,}$/.test(p.first_name ?? '') ? CONTACTS.find((c) => toE164(c.phone) === toE164(p.first_name!)) : undefined
+      // Prefer the name the saver gave; older invites (sent without one) come back as a phone number
+      const looksLikePhone = /^\+?\d{7,}$/.test(p.first_name ?? '')
+      const contact = !p.name && looksLikePhone ? contactStore.find(p.first_name!) : undefined
+      const label = p.name || contact?.name
       return {
-      id: p.id,
-      name: contact ? firstName(contact.name) : (p.first_name ?? 'Partner'),
-      initials: contact ? initials(contact.name) : (p.initials ?? 'P'),
-      // The API has no saver/supporter flag yet; `relation` is the closest hint
-      role: /sav|circle/i.test(p.relation ?? '') ? 'saver' : 'supporter',
-      status: p.status === 'accepted' ? 'active' : 'invited',
+        id: p.id,
+        name: label ? firstName(label) : (p.first_name ?? 'Partner'),
+        initials: label ? initials(label) : (p.initials ?? 'P'),
+        role: p.role === 'saver' ? 'saver' : 'supporter',
+        status: p.status === 'accepted' ? 'active' : 'invited',
       }
     })
   return ps.length ? ps : undefined
@@ -374,7 +383,7 @@ function toCircle(c: ApiCircle, createdAt: string | undefined, prev?: Circle): C
     members: c.members
       .filter((m) => m.status === 'joined' || m.status === 'invited')
       .map((m) => {
-        const contact = m.phone ? CONTACTS.find((x) => toE164(x.phone) === toE164(m.phone!)) : undefined
+        const contact = m.phone ? contactStore.find(m.phone) : undefined
         const pct = fromMoney(m.percent_of_target)
         return {
           name: m.is_me ? 'You' : contact && (m.status === 'invited' || /^\W/.test(m.first_name)) ? firstName(contact.name) : m.first_name,
@@ -405,7 +414,11 @@ export async function refreshCircle(id: string) {
   circleStore.upsert(toCircle(c, undefined, prev))
 }
 
-export type NewCircleInput = { name: string; icon: string; target: number; months: number; frequency: Frequency; phones: string[]; showAmounts: boolean }
+/** Someone picked from the user's saved contacts */
+export type Person = { name: string; phone: string }
+const toNamed = (people: Person[]) => people.map((p) => ({ name: p.name.trim().slice(0, 60), phone: toE164(p.phone) }))
+
+export type NewCircleInput = { name: string; icon: string; target: number; months: number; frequency: Frequency; members: Person[]; showAmounts: boolean }
 
 export async function createCircle(input: NewCircleInput): Promise<Circle> {
   const c = await api.post<ApiCircle>('/circles/', {
@@ -414,7 +427,7 @@ export async function createCircle(input: NewCircleInput): Promise<Circle> {
     target: toMoney(input.target),
     term_months: input.months,
     frequency: input.frequency,
-    member_phones: input.phones.map(toE164),
+    members: toNamed(input.members),
     show_amounts: input.showAmounts,
   })
   const circle = { ...toCircle(c, new Date().toISOString()), icon: input.icon }
@@ -423,8 +436,8 @@ export async function createCircle(input: NewCircleInput): Promise<Circle> {
   return circle
 }
 
-export async function inviteToCircle(circleId: string, phones: string[]) {
-  await api.post(`/circles/${circleId}/members/`, { member_phones: phones.map(toE164) })
+export async function inviteToCircle(circleId: string, people: Person[]) {
+  await api.post(`/circles/${circleId}/members/`, { members: toNamed(people) })
   await refreshCircle(circleId)
 }
 
@@ -499,15 +512,10 @@ export async function createGoal(input: NewGoalInput): Promise<Goal> {
   return goal
 }
 
-/** "024 412 3456" / "233244123456" → "+233244123456" */
-export function toE164(phone: string) {
-  const d = phone.replace(/\D/g, '')
-  return d.startsWith('233') ? `+${d}` : `+233${d.replace(/^0/, '')}`
-}
-
-/** Invites someone to a goal by phone. The API has no saver/supporter choice yet, so the role isn't sent. */
-export async function invitePartner(goalId: string, phone: string) {
-  await api.post(`/goals/${goalId}/partners/`, { phone: toE164(phone) })
+/** Invites someone to a goal as a saver ("save with me") or a supporter ("cheer me on") */
+export async function invitePartner(goalId: string, person: Person, role: 'saver' | 'supporter') {
+  const [p] = toNamed([person])
+  await api.post(`/goals/${goalId}/partners/`, { ...p, role })
 }
 
 /** Auto-save / reminders toggles; optimistic, rolled back if the API refuses */
