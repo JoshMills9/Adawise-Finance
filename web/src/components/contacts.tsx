@@ -14,7 +14,7 @@ const phoneContacts = typeof navigator !== 'undefined' ? (navigator as Navigator
 export const canPickPhoneContacts = !!phoneContacts?.select
 
 /** "+233 24 412 3456" / "0244123456" → "24 412 3456", the way the number field takes it */
-function toField(raw: string) {
+export function toField(raw: string) {
   const d = toE164(raw).slice(4)
   return isPhone(raw) ? `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}` : raw.replace(/[^\d ]/g, '').slice(0, 12)
 }

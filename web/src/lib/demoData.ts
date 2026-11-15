@@ -23,8 +23,19 @@ export type Goal = {
   /** Up to MAX_PARTNERS accountability partners */
   partners?: Partner[]
   nextContribution?: { amount: number; due: string }
-  plan?: { frequency: Frequency; months: number; amount: number; autoSave: boolean; reminders: boolean }
+  plan?: {
+    frequency: Frequency
+    months: number
+    amount: number
+    autoSave: boolean
+    reminders: boolean
+    /** Saved towards the current period's amount, and what's still needed (from the API) */
+    periodPaid?: number
+    periodRemaining?: number
+  }
   icon?: string
+  /** The API marks a goal completed once it's reached; a completed goal takes no more deposits */
+  completed?: boolean
   activity?: Activity[]
   /** Milestone progress reported by the API (overrides the local maths when present) */
   milestones?: { months: number; interest: number; earned: number[] }
@@ -34,7 +45,7 @@ export type Goal = {
   credit?: { amount: number; due: string; repaid?: number; takenOn?: string }
 }
 
-export type CircleMember = { name: string; initials: string; saved: number; status: 'active' | 'invited'; you?: boolean; /** API member id (for resending or cancelling an invite) */ id?: string }
+export type CircleMember = { name: string; initials: string; saved: number; status: 'active' | 'invited'; you?: boolean; /** API member id (for resending, editing or cancelling an invite) */ id?: string; phone?: string }
 export type Circle = {
   id: string
   name: string
@@ -51,6 +62,8 @@ export type Circle = {
   /** API: the circle's goal for you (adding money pays into it) */
   myGoalId?: string
   isOwner?: boolean
+  /** The API marks the circle completed once it's reached; no more deposits */
+  completed?: boolean
 }
 
 export const MAX_CIRCLE_MEMBERS = 10

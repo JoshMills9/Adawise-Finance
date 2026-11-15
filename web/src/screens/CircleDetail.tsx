@@ -8,10 +8,11 @@ import { addMonths, contribution, firstName, initials, localPhone, longDate, per
 import { circleStore, useCircle, useContacts } from '../lib/goalStore'
 import type { CircleMember } from '../lib/demoData'
 import { ApiError } from '../lib/api'
-import { cancelCircleInvite, contributeToCircle, errorText, inviteToCircle, leaveCircle, refreshCircle, resendCircleInvite, updateCircle } from '../lib/adawise'
+import { cancelCircleInvite, contributeToCircle, editCircleInvite, errorText, inviteToCircle, leaveCircle, refreshCircle, resendCircleInvite, updateCircle } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph, TrophyIcon } from '../components/goalIcons'
 import { AddContact } from '../components/contacts'
+import { EditInviteSheet } from '../components/editInvite'
 
 export function CircleDetail() {
   useThemeColor(ADA_DARK)
@@ -68,6 +69,8 @@ export function CircleDetail() {
   const active = circle.members.filter((m) => m.status === 'active')
   const invited = circle.members.filter((m) => m.status === 'invited')
   const me = circle.members.find((m) => m.you)
+  // Once your share (or the whole circle) is complete the API takes no more deposits
+  const done = !!circle.completed || (!!me && memberPct(circle, me) >= 100)
   const per = perLabel(circle.frequency)
   const perPeriod = contribution(circle.targetPerMember, circle.months, circle.frequency)
   const ends = addMonths(circle.months, circle.createdAt)
@@ -120,8 +123,9 @@ export function CircleDetail() {
                 </p>
                 <button
                   type="button"
+                  disabled={done}
                   onClick={() => setAdding(true)}
-                  className="flex h-[38px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-ada px-4 narrow:px-3 text-[14px] font-semibold text-white active:brightness-110"
+                  className="flex h-[38px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-ada px-4 narrow:px-3 text-[14px] font-semibold text-white active:brightness-110 disabled:bg-[#c5d0d1] disabled:active:brightness-100"
                 >
                   <PlusIcon size={16} /> Add money
                 </button>
@@ -415,10 +419,12 @@ function RenameSheet({ open, circle, onClose, onToast }: { open: boolean; circle
 /** Owner: what to do with someone who hasn't joined yet */
 function PendingSheet({ circle, member, onClose, onToast }: { circle: Circle; member: CircleMember | null; onClose: () => void; onToast: (m: string) => void }) {
   const [busy, setBusy] = useState<null | 'resend' | 'cancel'>(null)
+  const [editing, setEditing] = useState(false)
   // Keep the name while the sheet slides away
   const [last, setLast] = useState<CircleMember | null>(null)
   useEffect(() => {
     if (member) setLast(member)
+    else setEditing(false)
   }, [member])
   const m = member ?? last
   const run = async (kind: 'resend' | 'cancel') => {
@@ -440,22 +446,39 @@ function PendingSheet({ circle, member, onClose, onToast }: { circle: Circle; me
     }
   }
   return (
-    <Sheet open={member !== null} onClose={() => !busy && onClose()} label="Pending invite">
-      <h2 className="mt-4 text-[20px] font-bold text-ada-dark">{m?.name}</h2>
-      <p className="mt-1 text-[14px] text-muted">Hasn't joined {circle.name} yet. They get an SMS with a link to join.</p>
-      <div className="mt-5 flex flex-col gap-2">
-        <PrimaryButton disabled={!!busy} onClick={() => void run('resend')}>
-          {busy === 'resend' ? 'Sending…' : 'Send the invite again'}
-        </PrimaryButton>
-        <button
-          type="button"
-          disabled={!!busy}
-          onClick={() => void run('cancel')}
-          className="h-[46px] w-full rounded-full text-[15px] font-semibold text-[#c23a3a] disabled:opacity-60"
-        >
-          {busy === 'cancel' ? 'Cancelling…' : 'Cancel invite'}
-        </button>
-      </div>
-    </Sheet>
+    <>
+      <Sheet open={member !== null && !editing} onClose={() => !busy && onClose()} label="Pending invite">
+        <h2 className="mt-4 text-[20px] font-bold text-ada-dark">{m?.name}</h2>
+        <p className="mt-1 text-[14px] text-muted">Hasn't joined {circle.name} yet. They get an SMS with a link to join.</p>
+        <div className="mt-5 flex flex-col gap-2">
+          <PrimaryButton disabled={!!busy} onClick={() => void run('resend')}>
+            {busy === 'resend' ? 'Sending…' : 'Send the invite again'}
+          </PrimaryButton>
+          <button type="button" disabled={!!busy} onClick={() => setEditing(true)} className="h-[46px] w-full rounded-full text-[15px] font-semibold text-ada disabled:opacity-60">
+            Edit name or number
+          </button>
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => void run('cancel')}
+            className="h-[46px] w-full rounded-full text-[15px] font-semibold text-[#c23a3a] disabled:opacity-60"
+          >
+            {busy === 'cancel' ? 'Cancelling…' : 'Cancel invite'}
+          </button>
+        </div>
+      </Sheet>
+      <EditInviteSheet
+        open={member !== null && editing}
+        title="Edit invite"
+        initialName={m?.name ?? ''}
+        initialPhone={m?.phone}
+        onSave={async (patch) => {
+          await editCircleInvite(circle.id, m!.id!, patch)
+          onClose()
+        }}
+        onClose={() => setEditing(false)}
+        onToast={onToast}
+      />
+    </>
   )
 }

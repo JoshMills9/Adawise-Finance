@@ -17,6 +17,7 @@ import {
   Option,
   PrimaryButton,
   Processing,
+  Progress,
   Radio,
   Ring,
   SectionTitle,
@@ -46,8 +47,9 @@ import {
 import { addMonths, amountOf, cleanAmount, firstName, initials, iso, localPhone, longDate, perLabel } from '../lib/format'
 import { goalStore, useContacts, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
 import { AddContact } from '../components/contacts'
+import { EditInviteSheet } from '../components/editInvite'
 import { ApiError } from '../lib/api'
-import { removePartner, resendPartnerInvite, withdrawAllAndClose, askPartner, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
+import { removePartner, resendPartnerInvite, editPartnerInvite, withdrawAllAndClose, askPartners, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CheckMark, Glyph } from '../components/goalIcons'
 
@@ -62,12 +64,13 @@ export function GoalDetail() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [toast, toastNode] = useToast()
-  const [sheet, setSheet] = useState<SheetName>(() => (params.get('action') === 'add' ? 'deposit' : null))
+  const [sheet, setSheet] = useState<SheetName>(() => (params.get('action') === 'add' && !goalStore.all().find((g) => g.id === id)?.completed ? 'deposit' : null))
   const saveMe = useSaveMe()
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [loading, setLoading] = useState(true)
   const [removing, setRemoving] = useState<Partner | null>(null)
   const [resending, setResending] = useState<string | null>(null)
+  const [editingPartner, setEditingPartner] = useState<Partner | null>(null)
   const resend = async (p: Partner) => {
     if (!p.id || !goal) return
     setResending(p.id)
@@ -152,7 +155,7 @@ export function GoalDetail() {
         <div className="px-4">
           {/* Actions */}
           <div className={`${card} relative -mt-[44px] grid grid-cols-3 py-3`}>
-            <Action icon={PlusIcon} label="Add money" onClick={() => setSheet('deposit')} />
+            <Action icon={PlusIcon} label="Add money" disabled={goal.completed} onClick={() => setSheet('deposit')} />
             <Action
               icon={rule.allowed ? ArrowUpIcon : LockIcon}
               label="Withdraw"
@@ -207,6 +210,20 @@ export function GoalDetail() {
                     </div>
                   )}
                 </div>
+                {goal.plan.periodPaid !== undefined && goal.plan.periodRemaining !== undefined && (
+                  <div className="px-4 py-[14px]">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-[13px] text-muted">This {per}</p>
+                      <p className="text-[13px] font-semibold text-ink">
+                        {ghs(goal.plan.periodPaid)} <span className="font-medium text-muted">of {ghs(goal.plan.amount)}</span>
+                      </p>
+                    </div>
+                    <Progress value={goal.plan.amount > 0 ? Math.min(100, Math.round((goal.plan.periodPaid / goal.plan.amount) * 100)) : 0} />
+                    <p className="text-[12.5px] text-muted">
+                      {goal.plan.periodRemaining > 0 ? `${ghs(goal.plan.periodRemaining)} to go for this ${per}` : `You're done for this ${per}`}
+                    </p>
+                  </div>
+                )}
                 <ToggleRow
                   title="Auto-save from MoMo"
                   desc={`Move ${ghs(goal.plan.amount, 0)} every ${per}`}
@@ -231,30 +248,31 @@ export function GoalDetail() {
           <SectionTitle title="Accountability partners" action={<span className="text-[13px] text-muted">{goal.partners?.length ?? 0} of {MAX_PARTNERS}</span>} />
           <div className={`${card} divide-y divide-[#eef0f1]`}>
             {goal.partners?.map((p) => (
-              <div key={p.name} className="flex items-center gap-3 px-4 py-3">
+              <div key={p.name} className="flex items-start gap-3 px-4 py-3">
                 <Avatar initials={p.initials} size={38} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold text-ink">{p.name}</p>
                   <p className="text-[12.5px] text-muted">{p.role === 'saver' ? 'Saving with you · WiseCircle' : 'Supporter · can help through Save Me'}</p>
-                </div>
-                <div className="flex flex-col items-end">
-                  {p.status === 'invited' ? (
-                    // They accept in their own Adawise app; the goal refreshes when it reopens
-                    <Tag tone="amber">Invited</Tag>
-                  ) : (
-                    <Tag tone="teal">Active</Tag>
-                  )}
-                  {p.id && p.status === 'invited' && (
-                    <button type="button" disabled={resending === p.id} onClick={() => void resend(p)} className="mt-1 text-[12px] font-semibold text-ada disabled:opacity-60">
-                      {resending === p.id ? 'Sending…' : 'Resend'}
-                    </button>
-                  )}
                   {p.id && (
-                    <button type="button" onClick={() => setRemoving(p)} className="mt-1 text-[12px] font-semibold text-muted active:text-[#c23a3a]">
-                      Remove
-                    </button>
+                    <div className="mt-[6px] flex items-center gap-4 text-[13px] font-semibold">
+                      {p.status === 'invited' && (
+                        <>
+                          <button type="button" onClick={() => setEditingPartner(p)} className="text-ada active:opacity-60">
+                            Edit
+                          </button>
+                          <button type="button" disabled={resending === p.id} onClick={() => void resend(p)} className="text-ada active:opacity-60 disabled:opacity-60">
+                            {resending === p.id ? 'Sending…' : 'Resend'}
+                          </button>
+                        </>
+                      )}
+                      <button type="button" onClick={() => setRemoving(p)} className="text-muted active:text-[#c23a3a]">
+                        {p.status === 'invited' ? 'Cancel' : 'Remove'}
+                      </button>
+                    </div>
                   )}
                 </div>
+                {/* They accept from the SMS link or their own Adawise app; the goal refreshes when it reopens */}
+                {p.status === 'invited' ? <Tag tone="amber">Invited</Tag> : <Tag tone="teal">Active</Tag>}
               </div>
             ))}
             {(goal.partners?.length ?? 0) < MAX_PARTNERS && (
@@ -274,7 +292,7 @@ export function GoalDetail() {
                   icon={<PlusIcon size={24} />}
                   title="No activity yet"
                   text="Every deposit and withdrawal on this goal will show up here."
-                  action={{ label: 'Add money', onClick: () => setSheet('deposit') }}
+                  action={goal.completed ? undefined : { label: 'Add money', onClick: () => setSheet('deposit') }}
                 />
               )}
               {(showAllActivity ? activity : activity.slice(0, ACTIVITY_LIMIT)).map((a) => (
@@ -362,6 +380,15 @@ export function GoalDetail() {
           setRemoving(null)
         }}
       />
+      <EditInviteSheet
+        open={editingPartner !== null}
+        title="Edit invite"
+        initialName={editingPartner?.name ?? ''}
+        initialRole={editingPartner?.role}
+        onSave={(patch) => editPartnerInvite(goal.id, editingPartner!.id!, patch)}
+        onClose={() => setEditingPartner(null)}
+        onToast={toast}
+      />
       <AddPartnerSheet open={sheet === 'partner'} goal={goal} onClose={() => setSheet(null)} onToast={toast} />
       <SaveMeSheet open={sheet === 'saveme'} goal={goal} left={saveMe.left} onClose={() => setSheet(null)} onToast={toast} />
 
@@ -376,7 +403,6 @@ export function GoalDetail() {
 function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; goal: Goal; left: number; onClose: () => void; onToast: (m: string) => void }) {
   type Stage = 'choose' | 'partner' | 'waiting' | 'credit' | 'crediting'
   const [stage, setStage] = useState<Stage>('choose')
-  const [who, setWho] = useState<string>('')
   const [amount, setAmount] = useState('')
   const [creditAmt, setCreditAmt] = useState('')
   const [sending, setSending] = useState(false)
@@ -386,7 +412,7 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
   const fdReached = monthsSince(goal.createdAt) >= MILESTONES[0]!
   const creditLimit = fdReached ? Math.floor(goal.saved * CREDIT.maxShare) : 0
   const canCredit = creditLimit > 0 && !goal.credit
-  const askLabel = who === 'both' ? partners.map((p) => p.name).join(' & ') : who
+  const askLabel = partners.map((p) => p.name).join(' & ')
   const amt = amountOf(amount)
   const cAmt = amountOf(creditAmt)
   // A rescue covers the contribution you can't make, so it can't be more than that contribution
@@ -397,7 +423,6 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
     onClose()
     setTimeout(() => {
       setStage('choose')
-      setWho('')
       setAmount('')
       setCreditAmt('')
       setRequest(null)
@@ -430,12 +455,11 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
   }, [stage, request])
 
   const send = async () => {
-    // One open request at a time on the API: "Both partners" asks the first one
-    const partner = who === 'both' ? partners[0] : partners.find((p) => p.name === who)
-    if (!partner?.id) return onToast('This partner isn’t ready yet. Try again in a moment.')
+    if (!partners.length) return onToast('This partner isn’t ready yet. Try again in a moment.')
     setSending(true)
     try {
-      const r = await askPartner(goal.id, partner.id, amt)
+      // The API sends it to every accepted partner; the first to approve helps and the rest close
+      const r = await askPartners(goal.id, amt)
       setRequest({ id: r.id, status: r.status })
       setStage('waiting')
     } catch (e) {
@@ -463,7 +487,6 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
               selected={false}
               disabled={!partners.length || !left || !due}
               onClick={() => {
-                setWho(partners.length > 1 ? '' : partners[0]!.name)
                 setAmount(String(due))
                 setStage('partner')
               }}
@@ -504,22 +527,7 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
           <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Ask for help</h2>
           <p className="mt-1 text-[14px] text-muted">The money goes straight into “{goal.name}”.</p>
 
-          {partners.length > 1 && (
-            <>
-              <p className="mt-5 text-[14px] font-semibold text-ada-dark">Who should we ask?</p>
-              <div className={`${card} mt-2 divide-y divide-[#eef0f1]`}>
-                {[...partners.map((p) => ({ id: p.name, title: p.name, sub: p.role === 'saver' ? 'Saving with you' : 'Supporter' })), { id: 'both', title: 'Both partners', sub: 'The first to approve helps' }].map((o) => (
-                  <button key={o.id} type="button" onClick={() => setWho(o.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-semibold text-ink">{o.title}</span>
-                      <span className="block text-[12.5px] text-muted">{o.sub}</span>
-                    </span>
-                    <Radio on={who === o.id} />
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          {partners.length > 1 && <p className="mt-3 text-[13.5px] text-muted">We ask {askLabel}. The first to approve helps.</p>}
 
           <div className="mt-5">
             <Field
@@ -538,8 +546,8 @@ function SaveMeSheet({ open, goal, left, onClose, onToast }: { open: boolean; go
             />
           </div>
           <div className="mt-6">
-            <PrimaryButton disabled={!who || amt <= 0 || overDue || sending} onClick={() => void send()}>
-              {sending ? 'Sending request…' : `Send request${who ? ` to ${askLabel}` : ''}`}
+            <PrimaryButton disabled={amt <= 0 || overDue || sending} onClick={() => void send()}>
+              {sending ? 'Sending request…' : `Send request to ${askLabel}`}
             </PrimaryButton>
           </div>
           <button type="button" onClick={() => setStage('choose')} className="mt-1 h-[44px] w-full text-[15px] font-semibold text-muted">
@@ -645,9 +653,10 @@ function CreditProcessing({ onDone }: { onDone: () => void }) {
 
 /* ---------- pieces ---------- */
 
-function Action({ icon: I, label, onClick, badge, muted, divider }: { icon: Icon; label: string; onClick: () => void; badge?: string; muted?: boolean; divider?: boolean }) {
+function Action({ icon: I, label, onClick, badge, muted, divider, disabled }: { icon: Icon; label: string; onClick: () => void; badge?: string; muted?: boolean; divider?: boolean; disabled?: boolean }) {
+  muted = muted || disabled
   return (
-    <button type="button" onClick={onClick} className={`relative flex flex-col items-center gap-[6px] py-1 ${divider ? 'border-l border-[#eef0f1]' : ''}`}>
+    <button type="button" disabled={disabled} onClick={onClick} className={`relative flex flex-col items-center gap-[6px] py-1 disabled:cursor-not-allowed ${divider ? 'border-l border-[#eef0f1]' : ''}`}>
       <span className={`grid size-[46px] place-items-center rounded-full ${muted ? 'bg-[#eef2f4] text-muted' : 'bg-ada-soft text-ada'}`}>
         <I size={22} />
       </span>

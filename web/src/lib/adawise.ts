@@ -16,6 +16,9 @@ type ApiSchedule = {
   next_due_date: string
   auto_save_enabled?: boolean
   reminders_enabled?: boolean
+  /** Paid towards the current period, and what's left of it (never negative) */
+  period_paid?: string
+  period_remaining?: string
 }
 type ApiPartner = {
   id: string
@@ -109,8 +112,11 @@ export function toGoal(g: ApiGoal, prev?: Goal): Goal {
           amount: fromMoney(s.amount_per_period),
           autoSave: s.auto_save_enabled ?? true,
           reminders: s.reminders_enabled ?? true,
+          periodPaid: s.period_paid !== undefined ? fromMoney(s.period_paid) : undefined,
+          periodRemaining: s.period_remaining !== undefined ? fromMoney(s.period_remaining) : undefined,
         }
       : undefined,
+    completed: g.status === 'completed',
     lock: g.lock_state ? { locked: g.lock_state.locked, message: g.lock_state.message } : undefined,
     // Not in GoalRead: kept from the last /activity fetch and the local loan demo
     activity: prev?.activity,
@@ -300,9 +306,9 @@ export async function refreshSaveMe() {
 export type SaveMeStatus = 'pending' | 'approved' | 'declined' | 'expired' | 'cancelled' | 'completed' | 'failed'
 type ApiSaveMe = { id: string; partner_name: string | null; amount: string; status: SaveMeStatus }
 
-/** Asks one accepted partner to cover a contribution (the API allows one open request at a time) */
-export const askPartner = (goalId: string, partnerId: string, amount: number, message = '') =>
-  api.post<ApiSaveMe>(`/goals/${goalId}/saveme/`, { partner_id: partnerId, amount: toMoney(amount), message })
+/** Asks for help covering a contribution. It goes to every accepted partner and the first to approve wins (one open request at a time). */
+export const askPartners = (goalId: string, amount: number, message = '') =>
+  api.post<ApiSaveMe>(`/goals/${goalId}/saveme/`, { amount: toMoney(amount), message })
 
 export async function saveMeRequest(id: string) {
   const rows = await list<ApiSaveMe>('/saveme/requests/', {}, 1)
@@ -367,6 +373,7 @@ type ApiCircle = {
   is_owner: boolean
   plan: { amount_per_period: string; frequency: Frequency; term_months: number; end_date: string; target: string }
   my_goal_id: string | null
+  status?: 'active' | 'completed' | 'closed'
   members: ApiMember[]
 }
 type ApiCircleRow = { id: string; created_at: string }
@@ -391,6 +398,7 @@ function toCircle(c: ApiCircle, createdAt: string | undefined, prev?: Circle): C
         const pct = fromMoney(m.percent_of_target)
         return {
           id: m.id,
+          phone: m.phone ?? undefined,
           name: m.is_me ? 'You' : contact && (m.status !== 'joined' || /^\W/.test(m.first_name)) ? firstName(contact.name) : m.first_name,
           initials: contact && m.initials === '?' ? initials(contact.name) : m.initials,
           // Amounts are hidden unless show_amounts is on; the % is always there
@@ -403,6 +411,7 @@ function toCircle(c: ApiCircle, createdAt: string | undefined, prev?: Circle): C
     activity: prev?.activity ?? [],
     myGoalId: c.my_goal_id ?? undefined,
     isOwner: c.is_owner,
+    completed: c.status === 'completed',
   }
 }
 
@@ -532,6 +541,14 @@ export async function resendCircleInvite(circleId: string, memberId: string) {
   await api.post(`/circles/${circleId}/members/${memberId}/resend/`)
 }
 
+export type InvitePatch = { name?: string; phone?: string }
+
+/** Owner only, while they're still "invited". A new phone number gets a fresh SMS (counted against the daily cap), a name change sends nothing. */
+export async function editCircleInvite(circleId: string, memberId: string, patch: InvitePatch) {
+  await api.patch(`/circles/${circleId}/members/${memberId}/`, { name: patch.name?.trim(), phone: patch.phone ? toE164(patch.phone) : undefined })
+  await refreshCircle(circleId)
+}
+
 /** Owner only: withdraws a pending invite (409 if they've already joined) */
 export async function cancelCircleInvite(circleId: string, memberId: string) {
   await api.delete(`/circles/${circleId}/members/${memberId}/`)
@@ -655,6 +672,12 @@ export async function leaveCircle(circleId: string) {
   await api.post(`/circles/${circleId}/leave/`)
   circleStore.remove(circleId)
   await refreshGoals()
+}
+
+/** Owner only, while they're still "invited"; same rules as editing a circle invite (a new number gets a fresh SMS) */
+export async function editPartnerInvite(goalId: string, partnerId: string, patch: InvitePatch & { role?: 'saver' | 'supporter' }) {
+  await api.patch(`/goals/${goalId}/partners/${partnerId}/`, { name: patch.name?.trim(), phone: patch.phone ? toE164(patch.phone) : undefined, role: patch.role })
+  await refreshGoal(goalId)
 }
 
 /** Sends a fresh SMS link to a partner who hasn't answered yet (throttled, and capped per day: 429 invite_limit) */

@@ -502,7 +502,8 @@ export function GoalCard({ goal: g, money, onClick }: { goal: Goal; money: (n: n
 
 /** Goals with a next contribution, soonest first */
 export const upcoming = (goals: Goal[]) =>
-  goals.filter((g) => g.nextContribution).sort((a, b) => a.nextContribution!.due.localeCompare(b.nextContribution!.due))
+  // A completed goal has nothing left to pay
+  goals.filter((g) => g.nextContribution && !g.completed).sort((a, b) => a.nextContribution!.due.localeCompare(b.nextContribution!.due))
 
 export function ContributionRow({ goal: g, money, onPay, onOpen }: { goal: Goal; money: (n: number) => string; onPay: () => void; onOpen?: () => void }) {
   return (
