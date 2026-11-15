@@ -1,7 +1,7 @@
 // Adawise backend ↔ app: maps API payloads into the app's own types (so screens don't change)
 // and wraps the calls each screen makes. Results land in the stores in goalStore.ts.
 import { api, ApiError, auth, fromMoney, list, toMoney, waitForPayment, type ApiUser, type PaymentAttempt } from './api'
-import { type Activity, type Circle, type Frequency, type Goal, type GoalType, type Notice, type Partner } from './demoData'
+import { ghs, type Activity, type Circle, type Frequency, type Goal, type GoalType, type Notice, type Partner } from './demoData'
 import { firstName, initials, iso, toE164 } from './format'
 import { badgeStore, circleInviteStore, circleStore, contactStore, goalStore, noticeStore, profileStore, saveMeStore, walletStore, type WalletEntry } from './goalStore'
 
@@ -351,7 +351,7 @@ const ICON_CATEGORY: Record<string, ApiCategory> = { home: 'hostel_fund', travel
 type ApiMember = {
   id: string
   phone: string | null
-  status: 'joined' | 'invited' | 'declined' | 'left'
+  status: 'joined' | 'invited' | 'declined' | 'accepted_pending_signup' | 'left' | 'removed'
   first_name: string
   initials: string
   is_me: boolean
@@ -384,12 +384,14 @@ function toCircle(c: ApiCircle, createdAt: string | undefined, prev?: Circle): C
     createdAt: createdAt ? day(createdAt) : (prev?.createdAt ?? day(c.plan.end_date)),
     showAmounts: c.show_amounts,
     members: c.members
-      .filter((m) => m.status === 'joined' || m.status === 'invited')
+      // accepted_pending_signup: said yes by SMS link but hasn't made an account yet, so still waiting
+      .filter((m) => m.status === 'joined' || m.status === 'invited' || m.status === 'accepted_pending_signup')
       .map((m) => {
         const contact = m.phone ? contactStore.find(m.phone) : undefined
         const pct = fromMoney(m.percent_of_target)
         return {
-          name: m.is_me ? 'You' : contact && (m.status === 'invited' || /^\W/.test(m.first_name)) ? firstName(contact.name) : m.first_name,
+          id: m.id,
+          name: m.is_me ? 'You' : contact && (m.status !== 'joined' || /^\W/.test(m.first_name)) ? firstName(contact.name) : m.first_name,
           initials: contact && m.initials === '?' ? initials(contact.name) : m.initials,
           // Amounts are hidden unless show_amounts is on; the % is always there
           saved: m.balance !== null ? fromMoney(m.balance) : Math.round((pct / 100) * target * 100) / 100,
@@ -397,7 +399,7 @@ function toCircle(c: ApiCircle, createdAt: string | undefined, prev?: Circle): C
           you: m.is_me || undefined,
         }
       }),
-    // The API has no circle activity feed
+    // The feed comes from /circles/{id}/activity/ (refreshCircle); keep what we had until it loads
     activity: prev?.activity ?? [],
     myGoalId: c.my_goal_id ?? undefined,
     isOwner: c.is_owner,
@@ -411,10 +413,43 @@ export async function refreshCircles() {
   circleStore.replaceAll(details.map((c, i) => toCircle(c, rows[i]!.created_at, prev.get(c.id))))
 }
 
+type ApiCircleActivity = {
+  id: string
+  kind: 'member_joined' | 'member_saved' | 'member_left' | 'milestone'
+  member_first_name: string | null
+  is_me: boolean
+  /** Null unless the circle shows amounts or it's yours */
+  amount: string | null
+  percent_of_target: string | null
+  threshold_pct: number | null
+  created_at: string
+}
+
+function toCircleActivity(rows: ApiCircleActivity[]): Circle['activity'] {
+  return rows.map((a) => {
+    const who = a.is_me ? 'You' : (a.member_first_name ?? 'Someone')
+    const text =
+      a.kind === 'member_joined'
+        ? `${who} joined the circle`
+        : a.kind === 'member_left'
+          ? `${who} left the circle`
+          : a.kind === 'milestone'
+            ? `The circle reached ${a.threshold_pct ?? 0}% of its goal`
+            : a.amount !== null
+              ? `${who} saved ${ghs(fromMoney(a.amount))}`
+              : `${who} saved${a.percent_of_target ? ` · now at ${Math.round(fromMoney(a.percent_of_target))}%` : ''}`
+    return { id: a.id, text, date: day(a.created_at) }
+  })
+}
+
 export async function refreshCircle(id: string) {
-  const c = await api.get<ApiCircle>(`/circles/${id}/`)
+  const [c, feed] = await Promise.all([
+    api.get<ApiCircle>(`/circles/${id}/`),
+    list<ApiCircleActivity>(`/circles/${id}/activity/`, {}, 2).catch(() => null), // the circle still opens without its feed
+  ])
   const prev = circleStore.all().find((x) => x.id === id)
-  circleStore.upsert(toCircle(c, undefined, prev))
+  const circle = toCircle(c, undefined, prev)
+  circleStore.upsert(feed ? { ...circle, activity: toCircleActivity(feed) } : circle)
 }
 
 /** Someone picked from the user's saved contacts */
@@ -490,6 +525,17 @@ export async function acceptCircleInvite(inviteId: string): Promise<Circle> {
 export async function declineCircleInvite(inviteId: string) {
   await api.post(`/circle-invites/${inviteId}/decline/`)
   circleInviteStore.remove(inviteId)
+}
+
+/** Owner only: sends a fresh SMS link to someone who hasn't joined yet (throttled, and capped per day: 429 invite_limit) */
+export async function resendCircleInvite(circleId: string, memberId: string) {
+  await api.post(`/circles/${circleId}/members/${memberId}/resend/`)
+}
+
+/** Owner only: withdraws a pending invite (409 if they've already joined) */
+export async function cancelCircleInvite(circleId: string, memberId: string) {
+  await api.delete(`/circles/${circleId}/members/${memberId}/`)
+  await refreshCircle(circleId)
 }
 
 export async function inviteToCircle(circleId: string, people: Person[]) {
@@ -609,6 +655,11 @@ export async function leaveCircle(circleId: string) {
   await api.post(`/circles/${circleId}/leave/`)
   circleStore.remove(circleId)
   await refreshGoals()
+}
+
+/** Sends a fresh SMS link to a partner who hasn't answered yet (throttled, and capped per day: 429 invite_limit) */
+export async function resendPartnerInvite(goalId: string, partnerId: string) {
+  await api.post(`/goals/${goalId}/partners/${partnerId}/resend/`)
 }
 
 export async function removePartner(goalId: string, partnerId: string) {

@@ -26,7 +26,7 @@ import {
 } from '../components/ada'
 import { MAX_CIRCLE_MEMBERS, ghs, type Circle, type Frequency } from '../lib/demoData'
 import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, localPhone, longDate, perLabel, toE164 } from '../lib/format'
-import { circleStore, useContacts } from '../lib/goalStore'
+import { useContacts } from '../lib/goalStore'
 import { useToast } from '../components/ui'
 import { contributeToCircle, createCircle, errorText } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
@@ -95,7 +95,6 @@ export function NewCircle() {
       members: d.members,
       showAmounts: d.showAmounts,
     })
-    circleStore.log(saved.current.id, `You created the circle and invited ${d.members.length}`)
     return saved.current
   }
 
@@ -332,7 +331,6 @@ export function NewCircle() {
         run={async (amt) => {
           const c = await createOnServer()
           await contributeToCircle(c, amt)
-          circleStore.log(c.id, `You saved ${ghs(amt)} to start`)
         }}
         onCancel={() => setPaying(false)}
         onApproved={() => {

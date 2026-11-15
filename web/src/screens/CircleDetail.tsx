@@ -6,8 +6,9 @@ import { ACTIVITY_LIMIT, ADA_DARK, Avatar, Check, ConfirmSheet, DangerLink, Deta
 import { MAX_CIRCLE_MEMBERS, circleProgress, ghs, memberPct, shortDate, type Circle } from '../lib/demoData'
 import { addMonths, contribution, firstName, initials, localPhone, longDate, perLabel } from '../lib/format'
 import { circleStore, useCircle, useContacts } from '../lib/goalStore'
+import type { CircleMember } from '../lib/demoData'
 import { ApiError } from '../lib/api'
-import { contributeToCircle, errorText, inviteToCircle, leaveCircle, refreshCircle, updateCircle } from '../lib/adawise'
+import { cancelCircleInvite, contributeToCircle, errorText, inviteToCircle, leaveCircle, refreshCircle, resendCircleInvite, updateCircle } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph, TrophyIcon } from '../components/goalIcons'
 import { AddContact } from '../components/contacts'
@@ -24,6 +25,7 @@ export function CircleDetail() {
   const [loading, setLoading] = useState(true)
   const [leaving, setLeaving] = useState(false)
   const [renaming, setRenaming] = useState(false)
+  const [pending, setPending] = useState<CircleMember | null>(null)
   const back = () => goBack(navigate)
 
   // Fresh members and progress from the API every time the circle opens
@@ -167,15 +169,25 @@ export function CircleDetail() {
                 </div>
               )
             })}
-            {invited.map((m) => (
-              <div key={m.name} className="flex items-center gap-3 px-4 py-3">
-                <span className="w-[16px]" />
-                <Avatar initials={m.initials} size={36} />
-                <p className="min-w-0 flex-1 text-[15px] font-semibold text-muted">{m.name}</p>
-                {/* They join from their own Adawise app; the circle refreshes when it reopens */}
-                <Tag tone="amber">Invited</Tag>
-              </div>
-            ))}
+            {invited.map((m) => {
+              const manage = circle.isOwner && !!m.id
+              return (
+                <button
+                  key={m.id ?? m.name}
+                  type="button"
+                  disabled={!manage}
+                  onClick={() => setPending(m)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:cursor-default"
+                >
+                  <span className="w-[16px]" />
+                  <Avatar initials={m.initials} size={36} />
+                  <p className="min-w-0 flex-1 text-[15px] font-semibold text-muted">{m.name}</p>
+                  {/* They join from the SMS link or their own Adawise app; the circle refreshes when it reopens */}
+                  <Tag tone="amber">Invited</Tag>
+                  {manage && <ChevronRight size={16} className="shrink-0 text-dot" />}
+                </button>
+              )
+            })}
             {circle.members.length < MAX_CIRCLE_MEMBERS && (
               <button type="button" onClick={() => setInviting(true)} className="w-full px-4 py-3 text-left text-[14px] font-semibold text-ada">
                 + Invite more people
@@ -256,7 +268,6 @@ export function CircleDetail() {
         run={(amt) => contributeToCircle(circle, amt)}
         onClose={() => setAdding(false)}
         onDone={(amt) => {
-          circleStore.log(circle.id, `You saved ${ghs(amt)}`)
           setAdding(false)
           toast(`${ghs(amt)} added to ${circle.name}`)
         }}
@@ -272,6 +283,7 @@ export function CircleDetail() {
         onDone={() => navigate('/adawise/circles', { replace: true })}
       />
       <InviteSheet open={inviting} circle={circle} onClose={() => setInviting(false)} onToast={toast} />
+      <PendingSheet circle={circle} member={pending} onClose={() => setPending(null)} onToast={toast} />
       <RenameSheet open={renaming} circle={circle} onClose={() => setRenaming(false)} onToast={toast} />
       {toastNode}
     </div>
@@ -305,7 +317,6 @@ function InviteSheet({ open, circle, onClose, onToast }: { open: boolean; circle
     try {
       await inviteToCircle(circle.id, people)
       const names = people.map((p) => firstName(p.name)).join(', ')
-      circleStore.log(circle.id, `You invited ${names}`)
       onToast(`Invites sent to ${names}`)
       close()
     } catch (e) {
@@ -396,6 +407,54 @@ function RenameSheet({ open, circle, onClose, onToast }: { open: boolean; circle
         <PrimaryButton disabled={!ok} onClick={() => void save()}>
           {busy ? 'Saving…' : 'Save name'}
         </PrimaryButton>
+      </div>
+    </Sheet>
+  )
+}
+
+/** Owner: what to do with someone who hasn't joined yet */
+function PendingSheet({ circle, member, onClose, onToast }: { circle: Circle; member: CircleMember | null; onClose: () => void; onToast: (m: string) => void }) {
+  const [busy, setBusy] = useState<null | 'resend' | 'cancel'>(null)
+  // Keep the name while the sheet slides away
+  const [last, setLast] = useState<CircleMember | null>(null)
+  useEffect(() => {
+    if (member) setLast(member)
+  }, [member])
+  const m = member ?? last
+  const run = async (kind: 'resend' | 'cancel') => {
+    if (!member?.id) return
+    setBusy(kind)
+    try {
+      if (kind === 'resend') {
+        await resendCircleInvite(circle.id, member.id)
+        onToast(`Invite sent again to ${member.name}`)
+      } else {
+        await cancelCircleInvite(circle.id, member.id)
+        onToast(`Invite to ${member.name} cancelled`)
+      }
+      onClose()
+    } catch (e) {
+      onToast(errorText(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+  return (
+    <Sheet open={member !== null} onClose={() => !busy && onClose()} label="Pending invite">
+      <h2 className="mt-4 text-[20px] font-bold text-ada-dark">{m?.name}</h2>
+      <p className="mt-1 text-[14px] text-muted">Hasn't joined {circle.name} yet. They get an SMS with a link to join.</p>
+      <div className="mt-5 flex flex-col gap-2">
+        <PrimaryButton disabled={!!busy} onClick={() => void run('resend')}>
+          {busy === 'resend' ? 'Sending…' : 'Send the invite again'}
+        </PrimaryButton>
+        <button
+          type="button"
+          disabled={!!busy}
+          onClick={() => void run('cancel')}
+          className="h-[46px] w-full rounded-full text-[15px] font-semibold text-[#c23a3a] disabled:opacity-60"
+        >
+          {busy === 'cancel' ? 'Cancelling…' : 'Cancel invite'}
+        </button>
       </div>
     </Sheet>
   )

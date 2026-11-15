@@ -34,7 +34,7 @@ export type Goal = {
   credit?: { amount: number; due: string; repaid?: number; takenOn?: string }
 }
 
-export type CircleMember = { name: string; initials: string; saved: number; status: 'active' | 'invited'; you?: boolean }
+export type CircleMember = { name: string; initials: string; saved: number; status: 'active' | 'invited'; you?: boolean; /** API member id (for resending or cancelling an invite) */ id?: string }
 export type Circle = {
   id: string
   name: string

@@ -47,7 +47,7 @@ import { addMonths, amountOf, cleanAmount, firstName, initials, iso, localPhone,
 import { goalStore, useContacts, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
 import { AddContact } from '../components/contacts'
 import { ApiError } from '../lib/api'
-import { removePartner, withdrawAllAndClose, askPartner, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
+import { removePartner, resendPartnerInvite, withdrawAllAndClose, askPartner, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CheckMark, Glyph } from '../components/goalIcons'
 
@@ -67,6 +67,19 @@ export function GoalDetail() {
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [loading, setLoading] = useState(true)
   const [removing, setRemoving] = useState<Partner | null>(null)
+  const [resending, setResending] = useState<string | null>(null)
+  const resend = async (p: Partner) => {
+    if (!p.id || !goal) return
+    setResending(p.id)
+    try {
+      await resendPartnerInvite(goal.id, p.id)
+      toast(`Invite sent again to ${p.name}`)
+    } catch (e) {
+      toast(errorText(e)) // e.g. "resend too soon" or the daily invite limit
+    } finally {
+      setResending(null)
+    }
+  }
   const back = () => goBack(navigate)
 
   // Fresh detail + activity from the API every time the goal opens
@@ -230,6 +243,11 @@ export function GoalDetail() {
                     <Tag tone="amber">Invited</Tag>
                   ) : (
                     <Tag tone="teal">Active</Tag>
+                  )}
+                  {p.id && p.status === 'invited' && (
+                    <button type="button" disabled={resending === p.id} onClick={() => void resend(p)} className="mt-1 text-[12px] font-semibold text-ada disabled:opacity-60">
+                      {resending === p.id ? 'Sending…' : 'Resend'}
+                    </button>
                   )}
                   {p.id && (
                     <button type="button" onClick={() => setRemoving(p)} className="mt-1 text-[12px] font-semibold text-muted active:text-[#c23a3a]">

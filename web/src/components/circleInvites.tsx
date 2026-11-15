@@ -2,7 +2,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from './ui'
+import { Sheet, SheetRow } from './ada'
 import { Glyph } from './goalIcons'
+import { ChevronRight } from './icons'
 import { acceptCircleInvite, declineCircleInvite, errorText } from '../lib/adawise'
 import { ghs } from '../lib/demoData'
 import { firstName } from '../lib/format'
@@ -31,6 +33,7 @@ export function CircleInvites() {
 function InviteCard({ invite: i, onToast }: { invite: CircleInvite; onToast: (m: string) => void }) {
   const navigate = useNavigate()
   const [busy, setBusy] = useState<null | 'join' | 'decline'>(null)
+  const [open, setOpen] = useState(false)
   const owner = firstName(i.ownerName) || 'Someone'
 
   const join = async () => {
@@ -47,6 +50,7 @@ function InviteCard({ invite: i, onToast }: { invite: CircleInvite; onToast: (m:
     setBusy('decline')
     try {
       await declineCircleInvite(i.id)
+      setOpen(false)
       onToast(`Declined ${i.circleName}`)
     } catch (e) {
       onToast(errorText(e))
@@ -54,33 +58,73 @@ function InviteCard({ invite: i, onToast }: { invite: CircleInvite; onToast: (m:
     }
   }
 
-  return (
-    <div className="rounded-[16px] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-      <p className="flex items-center gap-2 text-[16px] font-bold text-ada-dark">
-        <Glyph name={i.icon} size={18} className="shrink-0 text-ada" />
-        <span className="min-w-0 truncate">{i.circleName}</span>
-      </p>
-      <p className="mt-1 text-[13.5px] text-muted">
-        {owner} invited you to save {ghs(i.target, 0)} each, together.
-      </p>
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          disabled={!!busy}
-          onClick={() => void decline()}
-          className="h-[40px] flex-1 rounded-full border-2 border-[#c5d0d1] text-[14px] font-semibold text-muted disabled:opacity-60"
-        >
-          {busy === 'decline' ? 'Declining…' : 'Decline'}
-        </button>
-        <button
-          type="button"
-          disabled={!!busy}
-          onClick={() => void join()}
-          className="h-[40px] flex-1 rounded-full bg-ada text-[14px] font-semibold text-white active:brightness-110 disabled:opacity-60"
-        >
-          {busy === 'join' ? 'Joining…' : 'Join circle'}
-        </button>
-      </div>
+  const buttons = (
+    <div className="mt-3 flex gap-2">
+      <button
+        type="button"
+        disabled={!!busy}
+        onClick={(e) => {
+          e.stopPropagation()
+          void decline()
+        }}
+        className="h-[40px] flex-1 rounded-full border-2 border-[#c5d0d1] text-[14px] font-semibold text-muted disabled:opacity-60"
+      >
+        {busy === 'decline' ? 'Declining…' : 'Decline'}
+      </button>
+      <button
+        type="button"
+        disabled={!!busy}
+        onClick={(e) => {
+          e.stopPropagation()
+          void join()
+        }}
+        className="h-[40px] flex-1 rounded-full bg-ada text-[14px] font-semibold text-white active:brightness-110 disabled:opacity-60"
+      >
+        {busy === 'join' ? 'Joining…' : 'Join circle'}
+      </button>
     </div>
+  )
+
+  // The invite only carries the name, who invited you and the amount (no circle id), so the details open in a sheet
+  return (
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen(true)}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen(true)}
+        className="cursor-pointer rounded-[16px] bg-white p-4 text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition active:scale-[0.99]"
+      >
+        <p className="flex items-center gap-2 text-[16px] font-bold text-ada-dark">
+          <Glyph name={i.icon} size={18} className="shrink-0 text-ada" />
+          <span className="min-w-0 flex-1 truncate">{i.circleName}</span>
+          <span className="shrink-0 text-dot">
+            <ChevronRight size={18} />
+          </span>
+        </p>
+        <p className="mt-1 text-[13.5px] text-muted">
+          {owner} invited you to save {ghs(i.target, 0)} each, together.
+        </p>
+        {buttons}
+      </div>
+
+      <Sheet open={open} onClose={() => !busy && setOpen(false)} label="Circle invite">
+        <h2 className="mt-4 flex items-center gap-2 text-[20px] font-bold text-ada-dark">
+          <Glyph name={i.icon} size={22} className="shrink-0 text-ada" />
+          {i.circleName}
+        </h2>
+        <p className="mt-1 text-[14px] text-muted">{owner} invited you to join this WiseCircle.</p>
+        <div className="mt-4 divide-y divide-[#e6ebec] rounded-[16px] bg-[#f4f6f7]">
+          <SheetRow label="Invited by" value={i.ownerName || owner} />
+          <SheetRow label="Everyone saves" value={ghs(i.target, 0)} />
+        </div>
+        <ul className="mt-4 flex flex-col gap-2 text-[14px] leading-snug text-ink">
+          <li>Each person saves towards their own {ghs(i.target, 0)} goal.</li>
+          <li>Each person owns their savings. No one can touch anyone else's money.</li>
+          <li>Joining creates a goal for you in the circle. You can leave later and keep your savings.</li>
+        </ul>
+        {buttons}
+      </Sheet>
+    </>
   )
 }
