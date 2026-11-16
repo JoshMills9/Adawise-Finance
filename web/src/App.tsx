@@ -19,6 +19,7 @@ import { ContributionsList, SupportingList } from './screens/Lists'
 import { CirclesTab, GoalsTab, ProfileTab, isAdaTab } from './screens/AdaTabs'
 import { Badges } from './screens/Badges'
 import { Credit } from './screens/Credit'
+import { SHOW_SAVE_ME_LOAN } from './lib/demoData'
 import { AdawiseLogin, AdawiseTerms, AdawiseWelcome } from './screens/AdawiseIntro'
 import { auth, UNAUTHORIZED_EVENT } from './lib/api'
 import { session } from './lib/session'
@@ -77,7 +78,7 @@ export function App() {
             <Route path="/adawise/circles" element={<Ada><CirclesTab /></Ada>} />
             <Route path="/adawise/profile" element={<Ada><ProfileTab /></Ada>} />
             <Route path="/adawise/badges" element={<Ada><Badges /></Ada>} />
-            <Route path="/adawise/loan" element={<Ada><Credit /></Ada>} />
+            <Route path="/adawise/loan" element={SHOW_SAVE_ME_LOAN ? <Ada><Credit /></Ada> : <Navigate to="/adawise" replace />} />
             <Route path="/adawise/contributions" element={<Ada><ContributionsList /></Ada>} />
             <Route path="/adawise/supporting" element={<Ada><SupportingList /></Ada>} />
             <Route path="*" element={<Navigate to="/" replace />} />

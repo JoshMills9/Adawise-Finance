@@ -27,7 +27,6 @@ import {
 import { MAX_CIRCLE_MEMBERS, ghs, type Circle, type Frequency } from '../lib/demoData'
 import { FREQUENCIES, addMonths, amountOf, cleanAmount, contribution, firstName, initials, localPhone, longDate, perLabel, toE164 } from '../lib/format'
 import { useContacts } from '../lib/goalStore'
-import { useToast } from '../components/ui'
 import { contributeToCircle, createCircle, errorText } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
@@ -63,7 +62,12 @@ export function NewCircle() {
   const [paying, setPaying] = useState(false)
   const [created, setCreated] = useState<Circle | null>(null)
   const [d, setD] = useState<Draft>({ icon: 'group', name: '', target: '', months: 6, frequency: 'weekly', members: [], showAmounts: false, deposit: '' })
-  const set = (p: Partial<Draft>) => setD((prev) => ({ ...prev, ...p }))
+  const [error, setError] = useState<string | null>(null)
+  const [paid, setPaid] = useState(false)
+  const set = (p: Partial<Draft>) => {
+    setError(null)
+    setD((prev) => ({ ...prev, ...p }))
+  }
 
   const target = amountOf(d.target)
   const deposit = amountOf(d.deposit)
@@ -72,12 +76,12 @@ export function NewCircle() {
 
   const go = (to: number) => {
     setDir(to > step ? 1 : -1)
+    setError(null)
     setStep(to)
   }
   const exit = () => goBack(navigate)
 
   const [busy, setBusy] = useState(false)
-  const [toast, toastNode] = useToast()
   const contacts = useContacts()
   const isMember = (phone: string) => d.members.some((m) => toE164(m.phone) === toE164(phone))
   const membersFull = d.members.length >= MAX_CIRCLE_MEMBERS - 1
@@ -100,11 +104,13 @@ export function NewCircle() {
 
   /** No first saving: just create */
   const create = async () => {
+    if (busy) return
     setBusy(true)
+    setError(null)
     try {
       setCreated(await createOnServer())
     } catch (e) {
-      toast(errorText(e))
+      setError(errorText(e))
     } finally {
       setBusy(false)
     }
@@ -118,7 +124,7 @@ export function NewCircle() {
         rows={[
           `Invites sent to ${d.members.map((m) => firstName(m.name)).join(', ')}`,
           `Everyone saves towards their own ${ghs(target, 0)}`,
-          ...(deposit > 0 ? [`Your first ${ghs(deposit)} is saved`] : []),
+          ...(paid ? [`Your first ${ghs(deposit)} is saved`] : deposit > 0 ? ['Your first saving didn’t go through. You can add it from the circle'] : []),
         ]}
         action="Open circle"
         onAction={() => navigate(`/adawise/circle/${created.id}`, { replace: true })}
@@ -312,6 +318,11 @@ export function NewCircle() {
       </div>
 
       <div className="shrink-0 border-t border-[#e6ebec] bg-white px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
+        {error && (
+          <p role="alert" className="mb-3 rounded-[12px] bg-[#fdecec] px-3 py-[10px] text-[13.5px] font-medium leading-snug text-[#b3261e]">
+            {error}
+          </p>
+        )}
         <PrimaryButton
           disabled={!valid || busy}
           onClick={() => {
@@ -332,13 +343,17 @@ export function NewCircle() {
           const c = await createOnServer()
           await contributeToCircle(c, amt)
         }}
-        onCancel={() => setPaying(false)}
+        onCancel={() => {
+          setPaying(false)
+          // The circle already exists (and invites went out): don't leave a form that would silently ignore edits
+          if (saved.current) setCreated(saved.current)
+        }}
         onApproved={() => {
           setPaying(false)
+          setPaid(true)
           if (saved.current) setCreated(saved.current)
         }}
       />
-      {toastNode}
     </div>
   )
 }

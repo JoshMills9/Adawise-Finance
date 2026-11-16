@@ -1,8 +1,8 @@
 // Adawise backend ↔ app: maps API payloads into the app's own types (so screens don't change)
 // and wraps the calls each screen makes. Results land in the stores in goalStore.ts.
-import { api, ApiError, auth, fromMoney, list, toMoney, waitForPayment, type ApiUser, type PaymentAttempt } from './api'
+import { api, ApiError, auth, firstDetail, fromMoney, list, toMoney, waitForPayment, type ApiUser, type PaymentAttempt } from './api'
 import { ghs, type Activity, type Circle, type Frequency, type Goal, type GoalType, type Notice, type Partner } from './demoData'
-import { firstName, initials, iso, toE164 } from './format'
+import { firstName, initials, iso, isPhone, toE164 } from './format'
 import { badgeStore, circleInviteStore, circleStore, contactStore, goalStore, noticeStore, profileStore, saveMeStore, walletStore, type WalletEntry } from './goalStore'
 
 /* ---------- API shapes (only the fields the app reads) ---------- */
@@ -481,6 +481,10 @@ const toNamed = (people: Person[]) => people.map((p) => ({ name: p.name.trim().s
 export type NewCircleInput = { name: string; icon: string; target: number; months: number; frequency: Frequency; members: Person[]; showAmounts: boolean }
 
 export async function createCircle(input: NewCircleInput): Promise<Circle> {
+  // Catch what we can before spending an invite SMS
+  const me = auth.user()?.phone
+  if (me && input.members.some((m) => toE164(m.phone) === toE164(me))) throw new ApiError("You're already in the circle. Remove your own number from the invites.", 400, 'self_invite')
+  if (input.members.some((m) => !isPhone(m.phone))) throw new ApiError('One of the phone numbers looks wrong. Check the invites and try again.', 400, 'bad_phone')
   const c = await api.post<ApiCircle>('/circles/', {
     name: input.name,
     category: ICON_CATEGORY[input.icon] ?? 'celebration',
@@ -490,6 +494,7 @@ export async function createCircle(input: NewCircleInput): Promise<Circle> {
     members: toNamed(input.members),
     show_amounts: input.showAmounts,
   })
+  if (!c || typeof c !== 'object' || !('id' in c)) throw new ApiError('Adawise sent back something unexpected. Check your circles before trying again.', 502, 'bad_response')
   const circle = { ...toCircle(c, new Date().toISOString()), icon: input.icon }
   circleStore.upsert(circle)
   void refreshGoals().catch(() => undefined) // the circle made you a goal
@@ -663,7 +668,25 @@ export async function updateGoalSettings(goalId: string, patch: { autoSave?: boo
   }
 }
 
-export const errorText = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+function friendlyBase(e: ApiError) {
+  if (e.code === 'invite_limit' || e.status === 429) return "You've reached today's invite limit, or invited this person a moment ago. Wait a little or try again tomorrow."
+  if (e.code === 'partner_opted_out') return 'One of the people you invited has opted out of SMS invites from Adawise. Remove them or use a different number.'
+  if (e.status === 401) return 'Your session has ended. Please sign in again.'
+  if (e.status === 403) return "You don't have permission to do that."
+  if (e.status >= 500) return 'Adawise is having trouble right now. Please try again in a moment.'
+  return e.message
+}
+
+/** What to tell the user: special codes and statuses get plain-language messages, the rest use the server's own text */
+export function errorText(e: unknown) {
+  if (e instanceof ApiError) {
+    const base = friendlyBase(e)
+    // Always include the server's own reason from `details` when it adds something
+    const reason = firstDetail(e.details)
+    return reason && !base.toLowerCase().includes(reason.toLowerCase()) ? `${base} (${reason})` : base
+  }
+  return e instanceof Error && e.message ? e.message : 'Something went wrong. Please try again.'
+}
 
 /* ---------- closing, leaving, removing ---------- */
 

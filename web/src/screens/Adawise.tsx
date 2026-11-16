@@ -610,7 +610,7 @@ function WithdrawSourceSheet({
   const unlocked = goals.filter((g) => g.saved > 0 && withdrawRule(g).allowed)
   const lockedCount = goals.filter((g) => g.saved > 0 && !withdrawRule(g).allowed).length
   const options: { id: string; title: string; sub: string; amount: number; src: WithdrawSource }[] = [
-    ...(walletBalance > 0 ? [{ id: 'wallet', title: 'Adawise wallet', sub: 'Deposits and Save Me loans', amount: walletBalance, src: { kind: 'wallet', amount: walletBalance } as const }] : []),
+    ...(walletBalance > 0 ? [{ id: 'wallet', title: 'Adawise wallet', sub: 'Your deposits', amount: walletBalance, src: { kind: 'wallet', amount: walletBalance } as const }] : []),
     ...unlocked.map((g) => ({ id: g.id, title: g.name, sub: withdrawRule(g).reason, amount: g.saved, src: { kind: 'goal', goal: g } as const })),
   ]
   const choice = options.find((o) => o.id === picked)

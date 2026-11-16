@@ -3,7 +3,7 @@ import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ADA_DARK, Chip, DEMO_NAME, DEMO_WALLET, EmptyState, card } from '../components/ada'
 import { ChevronRight, FlagIcon, HomeIcon, PlusIcon, ProfileIcon, SearchIcon, UsersIcon } from '../components/icons'
-import { GOAL_TYPE_LABEL, SHOW_PARTNER_SIDE, creditLeft, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
+import { GOAL_TYPE_LABEL, SHOW_PARTNER_SIDE, SHOW_SAVE_ME_LOAN, creditLeft, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
 import { signOutAdawise, useBadges, useCircles, useGoals, useProfile, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
 import { auth } from '../lib/api'
 import { refreshAdawise } from '../lib/adawise'
@@ -309,7 +309,7 @@ export function ProfileTab() {
             <Row label="Goals you support" note={`${supporting.length}`} onClick={() => navigate('/adawise/supporting')} />
           </>
         )}
-        <Row label="Save Me loan" note={owedNow > 0 ? `${ghs(owedNow, 0)} to repay` : 'Nothing owed'} onClick={() => navigate('/adawise/loan')} />
+        {SHOW_SAVE_ME_LOAN && <Row label="Save Me loan" note={owedNow > 0 ? `${ghs(owedNow, 0)} to repay` : 'Nothing owed'} onClick={() => navigate('/adawise/loan')} />}
         <Row label="Next contributions" onClick={() => navigate('/adawise/contributions')} />
         <Row label="Notifications" note={unread ? `${unread} unread` : undefined} onClick={() => navigate('/adawise/notifications')} />
       </section>

@@ -80,17 +80,51 @@ export function uuid() {
 export const fromMoney = (s: string | number | null | undefined) => Number(s ?? 0) || 0
 export const toMoney = (n: number) => (Math.round(n * 100) / 100).toFixed(2)
 
+const FIELD_LABEL: Record<string, string> = {
+  name: 'Name',
+  phone: 'Phone number',
+  target: 'Target',
+  term_months: 'Duration',
+  frequency: 'Saving frequency',
+  category: 'Category',
+  members: 'Members',
+  amount: 'Amount',
+  show_amounts: 'Privacy setting',
+}
+
+/** First readable sentence inside validation details, which arrive as strings, lists or {field: [..]} (nested for lists of people) */
+export function firstDetail(d: unknown, field?: string): string | undefined {
+  if (typeof d === 'string') {
+    const label = field && FIELD_LABEL[field]
+    return label && !d.toLowerCase().startsWith(label.toLowerCase()) ? `${label}: ${d}` : d
+  }
+  if (Array.isArray(d)) {
+    for (const x of d) {
+      const m = firstDetail(x, field)
+      if (m) return m
+    }
+  } else if (d && typeof d === 'object') {
+    for (const [k, v] of Object.entries(d)) {
+      const m = firstDetail(v, /^\d+$/.test(k) ? field : k)
+      if (m) return m
+    }
+  }
+  return undefined
+}
+
 /** Best human-readable message from the error envelope, DRF field errors or `detail` */
 function messageFrom(body: unknown, status: number): { message: string; code?: string; details?: unknown } {
   if (body && typeof body === 'object') {
     const b = body as Record<string, unknown>
     const env = b.error as { code?: string; message?: string; details?: unknown } | undefined
-    if (env?.message) return { message: env.message, code: env.code, details: env.details }
-    if (typeof b.detail === 'string') return { message: b.detail }
-    for (const v of Object.values(b)) {
-      if (typeof v === 'string') return { message: v, details: body }
-      if (Array.isArray(v) && typeof v[0] === 'string') return { message: v[0], details: body }
+    if (env?.message) {
+      // "Validation failed." says nothing: prefer the first field message inside the details
+      const generic = /^validation (failed|error)\.?$/i.test(env.message.trim())
+      return { message: (generic && firstDetail(env.details)) || env.message, code: env.code, details: env.details }
     }
+    if (typeof b.detail === 'string') return { message: b.detail }
+    const m = firstDetail(body)
+    if (m) return { message: m, details: body }
   }
   if (status === 0) return { message: "Can't reach Adawise. Check your connection and try again." }
   return { message: `Something went wrong (${status}). Please try again.` }
@@ -108,10 +142,16 @@ async function request<T>(method: string, path: string, { query, body, idempoten
   if (idempotent) headers['Idempotency-Key'] = uuid()
 
   let res: Response
+  const timer = new AbortController()
+  const timeout = setTimeout(() => timer.abort(), 30_000)
   try {
-    res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: timer.signal })
   } catch {
-    throw new ApiError(messageFrom(null, 0).message, 0, 'network')
+    throw timer.signal.aborted
+      ? new ApiError('Adawise is taking too long to respond. Check your connection and try again.', 0, 'timeout')
+      : new ApiError(messageFrom(null, 0).message, 0, 'network')
+  } finally {
+    clearTimeout(timeout)
   }
 
   const text = await res.text()

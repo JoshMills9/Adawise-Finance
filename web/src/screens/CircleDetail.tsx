@@ -11,6 +11,7 @@ import { ApiError } from '../lib/api'
 import { cancelCircleInvite, contributeToCircle, editCircleInvite, errorText, inviteToCircle, leaveCircle, refreshCircle, resendCircleInvite, updateCircle } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph, TrophyIcon } from '../components/goalIcons'
+import { Celebration, CelebrationButton } from '../components/celebration'
 import { AddContact } from '../components/contacts'
 import { EditInviteSheet } from '../components/editInvite'
 
@@ -89,19 +90,40 @@ export function CircleDetail() {
               {active.length} member{active.length === 1 ? '' : 's'}
               {invited.length ? ` · ${invited.length} invited` : ''} · ends {longDate(ends)}
             </p>
-            <div className="mt-5">
-              <Ring value={group}>
-                <div>
-                  <p className="text-[34px] font-bold leading-none">{group}%</p>
-                  <p className="mt-1 text-[12.5px] text-white/70">group progress</p>
-                </div>
-              </Ring>
-            </div>
-            <div className="mt-4 flex -space-x-[6px]">
-              {circle.members.slice(0, 6).map((m) => (
-                <Avatar key={m.name} initials={m.initials} size={32} ring dark={m.you} />
-              ))}
-            </div>
+            {done ? (
+            <Celebration
+              eyebrow={circle.completed ? 'Circle complete' : 'Target reached'}
+              title={circle.completed ? `${circle.name} did it!` : 'You hit your target!'}
+              subtitle={
+                circle.completed
+                  ? `${active.length} ${active.length === 1 ? 'person' : 'people'} saved together and every share is in. That's real teamwork.`
+                  : `Your ${ghs(circle.targetPerMember, 0)} is saved. The circle is at ${group}%, so cheer the others on.`
+              }
+              facts={[
+                { label: circle.completed ? 'Each saved' : 'You saved', value: ghs(circle.completed ? circle.targetPerMember : (me?.saved ?? circle.targetPerMember), 0) },
+                { label: 'Members', value: String(active.length) },
+                { label: 'Group', value: `${group}%` },
+              ]}
+            >
+              {circle.completed && <CelebrationButton onClick={() => navigate('/adawise/new-circle')}>Start a new circle</CelebrationButton>}
+            </Celebration>
+            ) : (
+              <>
+              <div className="mt-5">
+                <Ring value={group}>
+                  <div>
+                    <p className="text-[34px] font-bold leading-none">{group}%</p>
+                    <p className="mt-1 text-[12.5px] text-white/70">group progress</p>
+                  </div>
+                </Ring>
+              </div>
+              <div className="mt-4 flex -space-x-[6px]">
+                {circle.members.slice(0, 6).map((m) => (
+                  <Avatar key={m.name} initials={m.initials} size={32} ring dark={m.you} />
+                ))}
+              </div>
+              </>
+            )}
           </div>
         </DetailHeader>
 
