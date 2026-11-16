@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { PartnerGuideLink, PartnerGuideSheet } from '../components/partnerGuide'
 import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import { ClockIcon, DropletIcon, LockIcon, UsersIcon } from '../components/icons'
@@ -94,6 +95,7 @@ export function NewGoal() {
   const [created, setCreated] = useState<Goal | null>(null)
   const [busy, setBusy] = useState(false)
   const [toast, toastNode] = useToast()
+  const [guide, setGuide] = useState(false)
   // Set once the goal exists on the server, so a retried first deposit doesn't create it twice
   const saved = useRef<Goal | null>(null)
   const [d, setD] = useState<Draft>({
@@ -198,7 +200,7 @@ export function NewGoal() {
             {step === 0 && <StepGoal d={d} set={set} />}
             {step === 1 && <StepType d={d} set={set} target={target} />}
             {step === 2 && <StepPlan d={d} set={set} perPeriod={perPeriod} per={freqLabel.per} />}
-            {step === 3 && <StepPartner d={d} set={set} />}
+            {step === 3 && <StepPartner d={d} set={set} onGuide={() => setGuide(true)} />}
             {step === 4 && <StepReview d={d} set={set} target={target} perPeriod={perPeriod} per={freqLabel.per} goTo={go} />}
           </motion.div>
         </AnimatePresence>
@@ -244,6 +246,7 @@ export function NewGoal() {
           if (saved.current) setCreated({ ...saved.current, saved: deposit })
         }}
       />
+      <PartnerGuideSheet open={guide} onClose={() => setGuide(false)} />
       {toastNode}
     </div>
   )
@@ -371,7 +374,7 @@ function StepPlan({ d, set, perPeriod, per }: { d: Draft; set: (p: Partial<Draft
   )
 }
 
-function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
+function StepPartner({ d, set, onGuide }: { d: Draft; set: (p: Partial<Draft>) => void; onGuide: () => void }) {
   const contacts = useContacts()
   const roleRef = useRef<HTMLDivElement>(null)
   const list = d.partners
@@ -406,6 +409,7 @@ function StepPartner({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void })
         title="Add accountability partners"
         subtitle={`Add up to ${MAX_PARTNERS} people you trust to keep you on track. Optional, but you're more likely to succeed.`}
       />
+      <PartnerGuideLink onClick={onGuide} />
 
       <div className="mt-6 flex items-center justify-between">
         <p className="text-[14px] font-semibold text-ada-dark">{contacts.length ? 'Your contacts' : 'Add a partner'}</p>

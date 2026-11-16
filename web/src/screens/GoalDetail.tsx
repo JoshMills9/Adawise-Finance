@@ -47,6 +47,7 @@ import {
   type Partner,
 } from '../lib/demoData'
 import { addMonths, amountOf, cleanAmount, firstName, initials, iso, localPhone, longDate, perLabel } from '../lib/format'
+import { PartnerGuideLink, PartnerGuideSheet } from '../components/partnerGuide'
 import { Celebration, CelebrationButton } from '../components/celebration'
 import { goalStore, useContacts, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
 import { AddContact } from '../components/contacts'
@@ -836,6 +837,7 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
     }, 300)
   }
   const [busy, setBusy] = useState(false)
+  const [guide, setGuide] = useState(false)
   const send = async () => {
     if (!person || !role) return
     const name = firstName(person.name)
@@ -855,11 +857,13 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
   }
 
   return (
-    <Sheet open={open} onClose={close} label="Add a partner">
+    <>
+    <Sheet open={open && !guide} onClose={close} label="Add a partner">
       <h2 className="mt-4 text-[20px] font-bold text-ada-dark">Add a partner</h2>
       <p className="mt-1 text-[14px] text-muted">
         {goal.partners?.length ?? 0} of {MAX_PARTNERS} partners on {goal.name}
       </p>
+      <PartnerGuideLink onClick={() => setGuide(true)} />
       {options.length > 0 && (
         <div className={`${card} mt-4 divide-y divide-[#eef0f1]`}>
           {options.map((c) => (
@@ -890,5 +894,8 @@ function AddPartnerSheet({ open, goal, onClose, onToast }: { open: boolean; goal
         </PrimaryButton>
       </div>
     </Sheet>
+    {/* Swap sheets rather than stacking them, so the guide opens on its own and returns here */}
+    <PartnerGuideSheet open={open && guide} onClose={() => setGuide(false)} />
+    </>
   )
 }
