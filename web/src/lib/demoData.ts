@@ -36,6 +36,12 @@ export type Goal = {
   icon?: string
   /** The API marks a goal completed once it's reached; a completed goal takes no more deposits */
   completed?: boolean
+  /** ISO date the goal was reached (API `reached_on`); absent until then */
+  reachedOn?: string
+  /** Server-side permissions: when present they decide which actions the goal offers */
+  can?: { contribute: boolean; withdraw: boolean; saveMe: boolean }
+  /** Percent of target from the API (`percent_of_target`), frozen at 100 once completed */
+  percent?: number
   activity?: Activity[]
   /** Milestone progress reported by the API (overrides the local maths when present) */
   milestones?: { months: number; interest: number; earned: number[] }
@@ -86,6 +92,9 @@ export const GOAL_TYPE_LABEL: Record<GoalType, string> = {
 export function ghs(n: number, decimals = 2) {
   return 'GHS ' + n.toLocaleString('en-GH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
+
+/** Percent of target: the API's figure when we have it, otherwise worked out from the balance (demo data) */
+export const goalPct = (g: Goal) => Math.min(100, Math.round(g.percent ?? (g.target > 0 ? (g.saved / g.target) * 100 : 0)))
 
 export function shortDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })

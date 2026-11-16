@@ -299,9 +299,9 @@ export function Option({
   )
 }
 
-export function ToggleRow({ title, desc, on, onChange }: { title: string; desc: string; on: boolean; onChange: (v: boolean) => void }) {
+export function ToggleRow({ title, desc, on, onChange, disabled }: { title: string; desc: string; on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className="flex w-full items-center gap-3 px-4 py-[14px] text-left">
+    <button type="button" role="switch" aria-checked={on} disabled={disabled} onClick={() => onChange(!on)} className="flex w-full items-center gap-3 px-4 py-[14px] text-left disabled:cursor-not-allowed disabled:opacity-50">
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-semibold text-ink">{title}</span>
         <span className="block text-[13px] text-muted">{desc}</span>

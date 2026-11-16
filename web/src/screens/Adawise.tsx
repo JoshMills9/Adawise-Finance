@@ -24,6 +24,7 @@ import {
   GOAL_TYPE_LABEL,
   circleProgress,
   ghs,
+  goalPct,
   shortDate,
   totals,
   type Circle,
@@ -460,7 +461,7 @@ function partnerSummary(ps: NonNullable<Goal['partners']>) {
 
 export function GoalCard({ goal: g, money, onClick }: { goal: Goal; money: (n: number) => string; onClick: () => void }) {
   const I = TYPE_ICON[g.type]
-  const pct = Math.round((g.saved / g.target) * 100)
+  const pct = goalPct(g)
   const unlock: ReactNode =
     g.type === 'goal-locked'
       ? `Unlocks at ${ghs(g.target, 0)}`

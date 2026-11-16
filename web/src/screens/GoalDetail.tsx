@@ -37,6 +37,7 @@ import {
   MAX_PARTNERS,
   MILESTONES,
   ghs,
+  goalPct,
   monthsSince,
   shortDate,
   withdrawRule,
@@ -64,7 +65,7 @@ export function GoalDetail() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [toast, toastNode] = useToast()
-  const [sheet, setSheet] = useState<SheetName>(() => (params.get('action') === 'add' && !goalStore.all().find((g) => g.id === id)?.completed ? 'deposit' : null))
+  const [sheet, setSheet] = useState<SheetName>(() => (params.get('action') === 'add' && (() => { const g = goalStore.all().find((x) => x.id === id); return g ? (g.can?.contribute ?? !g.completed) : true })() ? 'deposit' : null))
   const saveMe = useSaveMe()
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -121,12 +122,16 @@ export function GoalDetail() {
     )
   }
 
-  const pct = Math.min(100, Math.round((goal.saved / goal.target) * 100))
+  const pct = goalPct(goal)
+  // The API says what a goal can do right now; without it (demo data) fall back to the old rules
+  const canContribute = goal.can?.contribute ?? !goal.completed
+  const canSaveMe = goal.can?.saveMe ?? !goal.completed
   const rule = withdrawRule(goal)
   const TypeIcon = TYPE_ICON[goal.type]
   const per = goal.plan ? perLabel(goal.plan.frequency) : 'week'
   const suggested = goal.plan?.amount ?? goal.nextContribution?.amount ?? 50
   const activity = goal.activity ?? []
+  const canWithdraw = goal.can?.withdraw ?? true
 
   return (
     <div className="font-ada relative flex h-full flex-col bg-[#f4f6f7]">
@@ -155,16 +160,26 @@ export function GoalDetail() {
         <div className="px-4">
           {/* Actions */}
           <div className={`${card} relative -mt-[44px] grid grid-cols-3 py-3`}>
-            <Action icon={PlusIcon} label="Add money" disabled={goal.completed} onClick={() => setSheet('deposit')} />
+            <Action icon={PlusIcon} label="Add money" disabled={!canContribute} onClick={() => setSheet('deposit')} />
             <Action
               icon={rule.allowed ? ArrowUpIcon : LockIcon}
               label="Withdraw"
               muted={!rule.allowed}
+              disabled={!canWithdraw}
               onClick={() => setSheet(rule.allowed ? 'withdraw' : 'locked')}
               divider
             />
-            <Action icon={LifebuoyIcon} label="Save Me" badge={`${saveMe.left} left`} onClick={() => setSheet('saveme')} divider />
+            <Action icon={LifebuoyIcon} label="Save Me" badge={canSaveMe ? `${saveMe.left} left` : undefined} disabled={!canSaveMe} onClick={() => setSheet('saveme')} divider />
           </div>
+
+          {goal.completed && (
+            <div className={`mt-3 flex flex-col gap-3 rounded-[14px] bg-ada-soft p-4 text-ada-dark`}>
+              <p className="flex items-center gap-2 text-[15px] font-bold">
+                <CheckMark size={18} /> Goal reached{goal.reachedOn ? ` on ${longDate(goal.reachedOn)}` : ''}
+              </p>
+              <PrimaryButton onClick={() => navigate('/adawise/new-goal')}>Start a new goal</PrimaryButton>
+            </div>
+          )}
 
           {/* Lock status */}
           <div className={`mt-3 flex items-center gap-3 rounded-[14px] px-4 py-3 text-[13.5px] ${rule.allowed ? 'bg-ada-soft text-ada-dark' : 'bg-[#fff4d6] text-[#6b4d00]'}`}>
@@ -229,12 +244,14 @@ export function GoalDetail() {
                   desc={`Move ${ghs(goal.plan.amount, 0)} every ${per}`}
                   on={goal.plan.autoSave}
                   onChange={(v) => updateGoalSettings(goal.id, { autoSave: v }).catch((e) => toast(errorText(e)))}
+                  disabled={!canContribute}
                 />
                 <ToggleRow
                   title="Reminders"
                   desc="A nudge before each saving day"
                   on={goal.plan.reminders}
                   onChange={(v) => updateGoalSettings(goal.id, { reminders: v }).catch((e) => toast(errorText(e)))}
+                  disabled={!canContribute}
                 />
               </div>
             </>
@@ -292,7 +309,7 @@ export function GoalDetail() {
                   icon={<PlusIcon size={24} />}
                   title="No activity yet"
                   text="Every deposit and withdrawal on this goal will show up here."
-                  action={goal.completed ? undefined : { label: 'Add money', onClick: () => setSheet('deposit') }}
+                  action={!canContribute ? undefined : { label: 'Add money', onClick: () => setSheet('deposit') }}
                 />
               )}
               {(showAllActivity ? activity : activity.slice(0, ACTIVITY_LIMIT)).map((a) => (

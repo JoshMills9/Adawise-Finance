@@ -13,7 +13,8 @@ type ApiSchedule = {
   frequency: Frequency
   term_months: number
   start_date: string
-  next_due_date: string
+  /** Null once the plan has nothing left to collect (e.g. the goal is completed) */
+  next_due_date: string | null
   auto_save_enabled?: boolean
   reminders_enabled?: boolean
   /** Paid towards the current period, and what's left of it (never negative) */
@@ -37,6 +38,12 @@ export type ApiGoal = {
   target: string
   balance: string
   status?: 'active' | 'completed' | 'closed'
+  percent_of_target?: string
+  completed_at?: string | null
+  reached_on?: string | null
+  can_contribute?: boolean
+  can_withdraw?: boolean
+  can_save_me?: boolean
   lock_state?: { locked: boolean; amount_to_go: string | null; unlocks_on: string | null; message: string } | null
   schedule?: ApiSchedule | null
   partners?: unknown[]
@@ -104,7 +111,7 @@ export function toGoal(g: ApiGoal, prev?: Goal): Goal {
     // GoalRead has no end_date, so the unlock date comes from the lock state (or what we already knew)
     unlockDate: g.lock_state?.unlocks_on ? day(g.lock_state.unlocks_on) : prev?.unlockDate,
     partners: toPartners(g.partners),
-    nextContribution: s ? { amount: fromMoney(s.amount_per_period), due: s.next_due_date } : undefined,
+    nextContribution: s?.next_due_date ? { amount: fromMoney(s.amount_per_period), due: s.next_due_date } : undefined,
     plan: s
       ? {
           frequency: s.frequency,
@@ -116,7 +123,13 @@ export function toGoal(g: ApiGoal, prev?: Goal): Goal {
           periodRemaining: s.period_remaining !== undefined ? fromMoney(s.period_remaining) : undefined,
         }
       : undefined,
-    completed: g.status === 'completed',
+    completed: g.status === 'completed' || !!g.completed_at,
+    reachedOn: g.reached_on ? day(g.reached_on) : g.completed_at ? day(g.completed_at) : undefined,
+    can:
+      g.can_contribute === undefined && g.can_withdraw === undefined && g.can_save_me === undefined
+        ? undefined
+        : { contribute: g.can_contribute ?? true, withdraw: g.can_withdraw ?? true, saveMe: g.can_save_me ?? true },
+    percent: g.percent_of_target !== undefined ? fromMoney(g.percent_of_target) : undefined,
     lock: g.lock_state ? { locked: g.lock_state.locked, message: g.lock_state.message } : undefined,
     // Not in GoalRead: kept from the last /activity fetch and the local loan demo
     activity: prev?.activity,
