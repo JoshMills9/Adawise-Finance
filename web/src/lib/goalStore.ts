@@ -261,6 +261,46 @@ export const partnerProfile = {
 }
 export const useHasSaveMePin = () => profile.useValue().pinPrint !== null
 
+/* ---------- withdrawal PIN (per signed-in user, kept on this device) ---------- */
+
+// Demo only, like the Save Me PIN: just a salted fingerprint is kept, never the PIN.
+// A real app would set and verify this on the Adawise backend.
+const WITHDRAW_TRIES = 3
+const WITHDRAW_LOCK_MS = 5 * 60 * 1000
+type WithdrawPinState = { print: string; fails: number; lockedUntil: number }
+const withdrawPins = createStore<Record<string, WithdrawPinState>>('adawise.withdrawPin', {})
+const pinOwner = () => auth.user()?.user_id ?? 'guest'
+const withdrawPrint = (pin: string) => fingerprint(`withdraw:${pinOwner()}:${pin}`)
+const mine = () => withdrawPins.get()[pinOwner()]
+const saveMine = (s: WithdrawPinState) => withdrawPins.set({ ...withdrawPins.get(), [pinOwner()]: s })
+
+export type WithdrawPinCheck = { ok: true } | { ok: false; triesLeft: number; lockedUntil: number }
+
+export const withdrawPin = {
+  has: () => mine() !== undefined,
+  set: (pin: string) => saveMine({ print: withdrawPrint(pin), fails: 0, lockedUntil: 0 }),
+  /** Time the PIN is locked until after too many wrong tries (0 when it isn't) */
+  lockedUntil: () => {
+    const s = mine()
+    return s && s.lockedUntil > Date.now() ? s.lockedUntil : 0
+  },
+  check(pin: string): WithdrawPinCheck {
+    const s = mine()
+    if (!s) return { ok: false, triesLeft: 0, lockedUntil: 0 }
+    if (s.lockedUntil > Date.now()) return { ok: false, triesLeft: 0, lockedUntil: s.lockedUntil }
+    if (s.print === withdrawPrint(pin)) {
+      saveMine({ ...s, fails: 0, lockedUntil: 0 })
+      return { ok: true }
+    }
+    const fails = s.fails + 1
+    const lockedUntil = fails >= WITHDRAW_TRIES ? Date.now() + WITHDRAW_LOCK_MS : 0
+    saveMine({ ...s, fails: lockedUntil ? 0 : fails, lockedUntil })
+    return { ok: false, triesLeft: lockedUntil ? 0 : WITHDRAW_TRIES - fails, lockedUntil }
+  },
+  reset: withdrawPins.reset,
+}
+export const useHasWithdrawPin = () => withdrawPins.useValue()[pinOwner()] !== undefined
+
 /* ---------- WiseBadges and profile (from the API) ---------- */
 
 export type ApiBadge = { months: number; earned: boolean; earnedOn?: string; now: number }
@@ -320,6 +360,7 @@ export function resetAdawise() {
   requestStore.reset()
   supportStore.reset()
   partnerProfile.reset()
+  withdrawPin.reset()
   contactStore.reset()
 }
 

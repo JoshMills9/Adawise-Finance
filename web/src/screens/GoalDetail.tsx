@@ -381,6 +381,7 @@ export function GoalDetail() {
         confirmLabel={goal.saved > 0 ? `Withdraw ${ghs(goal.saved)} & close` : 'Close goal'}
         busyTitle={goal.saved > 0 ? 'Withdrawing and closing…' : 'Closing your goal…'}
         busySubtitle={goal.saved > 0 ? 'Waiting for MoMo confirmation' : 'This takes a moment'}
+        pin={goal.saved > 0 ? `To withdraw ${ghs(goal.saved)} and close ${goal.name}` : undefined}
         run={() => withdrawAllAndClose(goal)}
         onClose={() => setSheet(null)}
         onDone={() => navigate('/adawise/goals', { replace: true })}

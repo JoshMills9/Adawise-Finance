@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react"
 import type { NavigateFunction } from "react-router-dom"
 import { ghs } from '../lib/demoData'
 import { PERIODS, amountOf, cleanAmount } from '../lib/format'
+import { withdrawPin } from '../lib/goalStore'
 import { BulbIcon, CheckMark } from './goalIcons'
 import { ChevronRight } from './icons'
 
@@ -489,8 +490,8 @@ export function Processing({ title, subtitle }: { title: string; subtitle: strin
 }
 
 /**
- * Add money / withdraw: amount → confirm → processing. Pass `fixedAmount` to skip
- * straight to confirm. Demo only: no PIN is asked for and no real money moves.
+ * Add money / withdraw: amount → confirm → (withdrawal PIN) → processing. Pass `fixedAmount`
+ * to skip straight to confirm. Demo only: no real money moves.
  */
 export function MoneySheet({
   open,
@@ -516,9 +517,11 @@ export function MoneySheet({
   onClose: () => void
   onDone: (amount: number) => void
 }) {
-  const [stage, setStage] = useState<'amount' | 'confirm' | 'processing' | 'failed'>('amount')
+  const [stage, setStage] = useState<'amount' | 'confirm' | 'pin' | 'processing' | 'failed'>('amount')
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
+  // The PIN is asked once per opening; a retry after a failed payment doesn't ask again
+  const [verified, setVerified] = useState(false)
   const done = useRef(onDone)
   done.current = onDone
   const runRef = useRef(run)
@@ -528,6 +531,7 @@ export function MoneySheet({
     if (!open) return
     setStage(fixedAmount ? 'confirm' : 'amount')
     setValue(fixedAmount ? String(fixedAmount) : '')
+    setVerified(false)
   }, [open, fixedAmount])
 
   const amount = fixedAmount ?? amountOf(value)
@@ -601,9 +605,11 @@ export function MoneySheet({
             <SheetRow label={withdraw ? 'To' : 'From'} value={`MoMo wallet ${DEMO_WALLET}`} />
             <SheetRow label="Fee" value="GHS 0.00" />
           </div>
-          <p className="mt-3 text-center text-[12.5px] text-muted">Demo only. No real money moves and no PIN is needed.</p>
+          <p className="mt-3 text-center text-[12.5px] text-muted">
+            {withdraw ? "Demo only. No real money moves. You'll confirm with your withdrawal PIN." : 'Demo only. No real money moves and no PIN is needed.'}
+          </p>
           <div className="mt-4">
-            <PrimaryButton onClick={() => setStage('processing')}>{withdraw ? 'Confirm withdrawal' : 'Approve payment'}</PrimaryButton>
+            <PrimaryButton onClick={() => setStage(withdraw && !verified ? 'pin' : 'processing')}>{withdraw ? 'Confirm withdrawal' : 'Approve payment'}</PrimaryButton>
           </div>
           <button
             type="button"
@@ -613,6 +619,17 @@ export function MoneySheet({
             {fixedAmount ? 'Cancel' : 'Back'}
           </button>
         </>
+      )}
+
+      {stage === 'pin' && (
+        <WithdrawPinStep
+          subtitle={`To withdraw ${ghs(amount)} to MoMo wallet ${DEMO_WALLET}`}
+          onVerified={() => {
+            setVerified(true)
+            setStage('processing')
+          }}
+          onCancel={() => setStage('confirm')}
+        />
       )}
 
       {stage === 'processing' && <Processing title="Processing…" subtitle="Waiting for MoMo confirmation" />}
@@ -644,6 +661,7 @@ export function ConfirmSheet({
   confirmLabel,
   busyTitle = 'Working on it…',
   busySubtitle = 'This takes a moment',
+  pin,
   run,
   onClose,
   onDone,
@@ -654,14 +672,19 @@ export function ConfirmSheet({
   confirmLabel: string
   busyTitle?: string
   busySubtitle?: string
+  /** Ask for the withdrawal PIN before running (when the action moves money out) */
+  pin?: string
   run: () => Promise<unknown>
   onClose: () => void
   onDone: () => void
 }) {
-  const [stage, setStage] = useState<'ask' | 'busy' | 'failed'>('ask')
+  const [stage, setStage] = useState<'ask' | 'pin' | 'busy' | 'failed'>('ask')
   const [error, setError] = useState('')
+  const [verified, setVerified] = useState(false)
   useEffect(() => {
-    if (open) setStage('ask')
+    if (!open) return
+    setStage('ask')
+    setVerified(false)
   }, [open])
 
   const go = async () => {
@@ -679,6 +702,15 @@ export function ConfirmSheet({
     <Sheet open={open} onClose={stage === 'busy' ? undefined : onClose} label={title}>
       {stage === 'busy' ? (
         <Processing title={busyTitle} subtitle={busySubtitle} />
+      ) : stage === 'pin' ? (
+        <WithdrawPinStep
+          subtitle={pin}
+          onVerified={() => {
+            setVerified(true)
+            void go()
+          }}
+          onCancel={() => setStage('ask')}
+        />
       ) : (
         <>
           <h2 className="mt-4 text-[20px] font-bold text-ada-dark">{stage === 'failed' ? "That didn't work" : title}</h2>
@@ -686,7 +718,7 @@ export function ConfirmSheet({
           <div className="mt-6">
             <button
               type="button"
-              onClick={() => void go()}
+              onClick={() => (pin && !verified ? setStage('pin') : void go())}
               className="h-[54px] w-full rounded-full bg-[#c23a3a] text-[16px] font-semibold text-white transition active:brightness-110"
             >
               {stage === 'failed' ? 'Try again' : confirmLabel}
@@ -736,7 +768,87 @@ export function goBack(navigate: NavigateFunction, fallback = "/adawise") {
 }
 
 /**
- * 4-digit Save Me PIN entry with its own keypad (this is NOT the MoMo PIN).
+ * Withdrawal PIN inside a sheet: creates one (enter + confirm) the first time, otherwise checks it.
+ * Three wrong tries lock withdrawals on this device for a few minutes.
+ */
+export function WithdrawPinStep({ subtitle, onVerified, onCancel }: { subtitle?: string; onVerified: () => void; onCancel: () => void }) {
+  const [step, setStep] = useState<'enter' | 'create' | 'confirm'>(() => (withdrawPin.has() ? 'enter' : 'create'))
+  const [firstPin, setFirstPin] = useState('')
+  const [error, setError] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const [lockedUntil, setLockedUntil] = useState(() => withdrawPin.lockedUntil())
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!lockedUntil) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [lockedUntil])
+
+  const wrong = (msg: string) => {
+    setError(msg)
+    setAttempt((a) => a + 1)
+  }
+
+  if (lockedUntil && lockedUntil > now) {
+    const secs = Math.ceil((lockedUntil - now) / 1000)
+    const wait = secs >= 60 ? `${Math.ceil(secs / 60)} min` : `${secs}s`
+    return (
+      <div className="flex flex-col items-center pt-6 text-center">
+        <p className="text-[18px] font-bold text-ada-dark">Withdrawals are paused</p>
+        <p className="mt-2 max-w-[300px] text-[14px] text-muted">Too many wrong PINs. To keep your money safe, try again in {wait}.</p>
+        <div className="mt-6 w-full">
+          <PrimaryButton onClick={onCancel}>OK</PrimaryButton>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <PinPad
+        resetKey={attempt}
+        error={error}
+        title={step === 'enter' ? 'Enter your withdrawal PIN' : step === 'create' ? 'Create a withdrawal PIN' : 'Confirm your PIN'}
+        subtitle={
+          step === 'enter'
+            ? subtitle
+            : step === 'create'
+              ? 'You’ll use these 4 digits to approve every withdrawal. It’s separate from your MoMo PIN.'
+              : 'Enter the same 4 digits again.'
+        }
+        onComplete={(pin) => {
+          if (step === 'create') {
+            setFirstPin(pin)
+            setError('')
+            setAttempt((a) => a + 1)
+            setStep('confirm')
+          } else if (step === 'confirm') {
+            if (pin !== firstPin) {
+              setStep('create')
+              return wrong("PINs don't match. Try again.")
+            }
+            withdrawPin.set(pin)
+            onVerified()
+          } else {
+            const r = withdrawPin.check(pin)
+            if (r.ok) return onVerified()
+            if (r.lockedUntil) {
+              setNow(Date.now())
+              setLockedUntil(r.lockedUntil)
+            } else wrong(`Incorrect PIN. ${r.triesLeft} ${r.triesLeft === 1 ? 'try' : 'tries'} left`)
+          }
+        }}
+      />
+      <button type="button" onClick={onCancel} className="mt-2 h-[44px] w-full text-[15px] font-semibold text-muted active:opacity-60">
+        Back
+      </button>
+    </>
+  )
+}
+
+/**
+ * 4-digit PIN entry (Save Me or withdrawal) with its own keypad (this is NOT the MoMo PIN).
  * Change `resetKey` to clear the dots, e.g. after a wrong PIN.
  */
 export function PinPad({
