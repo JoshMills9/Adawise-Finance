@@ -56,11 +56,14 @@
   --font-ada: "MTN Brighter Sans", "Quicksand Variable", system-ui, sans-serif;
 }
 
-.font-ada {
-  font-weight: 400;
-  /* Adawise text and icons use a slate ink; the MoMo screens keep the original */
-  --color-ink: #1e2937;
-  color: var(--color-ink);
+/* In a layer so utility classes on the same element (e.g. text-white on a dark screen) still win */
+@layer components {
+  .font-ada {
+    font-weight: 400;
+    /* Adawise text and icons use a slate ink; the MoMo screens keep the original */
+    --color-ink: #1e2937;
+    color: var(--color-ink);
+  }
 }
 
 /* Adawise headers and dark cards */
