@@ -19,7 +19,8 @@ import { ContributionsList, SupportingList } from './screens/Lists'
 import { CirclesTab, GoalsTab, ProfileTab, isAdaTab } from './screens/AdaTabs'
 import { Badges } from './screens/Badges'
 import { Credit } from './screens/Credit'
-import { SHOW_SAVE_ME_LOAN } from './lib/demoData'
+import { SHOW_EMERGENCY, SHOW_SAVE_ME_LOAN } from './lib/demoData'
+import { EmergencyWithdraw } from './screens/Emergency'
 import { AdawiseLogin, AdawiseTerms, AdawiseWelcome } from './screens/AdawiseIntro'
 import { auth, UNAUTHORIZED_EVENT } from './lib/api'
 import { session } from './lib/session'
@@ -69,6 +70,7 @@ export function App() {
             <Route path="/adawise" element={<Ada><Adawise /></Ada>} />
             <Route path="/adawise/new-goal" element={<Ada><NewGoal /></Ada>} />
             <Route path="/adawise/goal/:id" element={<Ada><GoalDetail /></Ada>} />
+            <Route path="/adawise/goal/:id/emergency" element={SHOW_EMERGENCY ? <Ada><EmergencyWithdraw /></Ada> : <Navigate to="/adawise" replace />} />
             <Route path="/adawise/new-circle" element={<Ada><NewCircle /></Ada>} />
             <Route path="/adawise/circle/:id" element={<Ada><CircleDetail /></Ada>} />
             <Route path="/adawise/requests" element={<Ada><RequestsList /></Ada>} />

@@ -6,6 +6,7 @@ import {
   ACTIVITY_LIMIT,
   ADA_DARK,
   Avatar,
+  Chip,
   ConfirmSheet,
   DangerLink,
   DetailHeader,
@@ -36,6 +37,7 @@ import {
   GOAL_TYPE_LABEL,
   MAX_PARTNERS,
   SHOW_SAVE_ME_LOAN,
+  SHOW_EMERGENCY,
   MILESTONES,
   ghs,
   goalPct,
@@ -50,6 +52,8 @@ import { addMonths, amountOf, cleanAmount, firstName, initials, iso, localPhone,
 import { PartnerGuideLink, PartnerGuideSheet } from '../components/partnerGuide'
 import { Celebration, CelebrationButton } from '../components/celebration'
 import { goalStore, useContacts, useGoal, useSaveMe, walletStore } from '../lib/goalStore'
+import { EMERGENCY, contributeWithSlice, setSlice, sliceOf, splitContribution, useEmergencyState, usePocket } from '../lib/emergency'
+import { PocketSheet } from '../components/pocket'
 import { AddContact } from '../components/contacts'
 import { EditInviteSheet } from '../components/editInvite'
 import { ApiError } from '../lib/api'
@@ -254,6 +258,8 @@ export function GoalDetail() {
             </>
           )}
 
+          {SHOW_EMERGENCY && <EmergencySection goal={goal} locked={!rule.allowed} />}
+
           {/* Milestones */}
           <SectionTitle title="Milestones" />
           <Milestones goal={goal} />
@@ -342,7 +348,7 @@ export function GoalDetail() {
         title="Add money"
         to={goal.name}
         suggestions={[...new Set([suggested, 50, 100, 200])]}
-        run={(amt) => contributeToGoal(goal.id, amt)}
+        run={(amt) => (SHOW_EMERGENCY ? contributeWithSlice(goal.id, amt) : contributeToGoal(goal.id, amt))}
         onClose={() => setSheet(null)}
         onDone={(amt) => {
           setSheet(null)
@@ -376,6 +382,15 @@ export function GoalDetail() {
         <div className="mt-5">
           <PrimaryButton onClick={() => setSheet('saveme')}>Use Save Me</PrimaryButton>
         </div>
+        {SHOW_EMERGENCY && (
+          <button
+            type="button"
+            onClick={() => navigate(`/adawise/goal/${goal.id}/emergency`)}
+            className="mt-2 h-[48px] w-full rounded-full border-2 border-ada text-[15px] font-semibold text-ada active:bg-ada-soft"
+          >
+            I have an emergency
+          </button>
+        )}
         <button type="button" onClick={() => setSheet(null)} className="mt-1 h-[44px] w-full text-[15px] font-semibold text-muted">
           Keep saving
         </button>
@@ -762,6 +777,100 @@ function Action({ icon: I, label, onClick, badge, muted, divider, disabled }: { 
       <span className={`text-[13px] font-semibold ${muted ? 'text-muted' : 'text-ada-dark'}`}>{label}</span>
       {badge && <span className="absolute right-[14%] top-0 rounded-full bg-ada px-[6px] text-[10px] font-bold leading-[16px] text-white">{badge}</span>}
     </button>
+  )
+}
+
+/** Safety slice for this goal, the shared emergency pocket, and any emergency in progress */
+function EmergencySection({ goal, locked }: { goal: Goal; locked: boolean }) {
+  const navigate = useNavigate()
+  const state = useEmergencyState()
+  const pocket = usePocket()
+  const pct = sliceOf(state, goal.id)
+  const em = state.emergencies[goal.id]
+  const active = em && em.status !== 'cancelled' ? em : undefined
+  const per = goal.plan ? perLabel(goal.plan.frequency) : undefined
+  const example = goal.plan ? splitContribution(goal.id, goal.plan.amount) : undefined
+  const canContribute = goal.can?.contribute ?? !goal.completed
+  const [pocketOpen, setPocketOpen] = useState(false)
+
+  return (
+    <>
+      <SectionTitle title="Emergency protection" />
+      <PocketSheet open={pocketOpen} onClose={() => setPocketOpen(false)} />
+      {active?.status === 'cooling' && (
+        <button
+          type="button"
+          onClick={() => navigate(`/adawise/goal/${goal.id}/emergency`)}
+          className="mb-3 flex w-full items-center gap-3 rounded-[16px] bg-[#fff4d6] px-4 py-3 text-left active:brightness-95"
+        >
+          <span className="text-[#8a6300]">
+            <ClockIcon size={22} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold text-ada-dark">Emergency withdrawal in progress</span>
+            <span className="block text-[12.5px] text-[#6b5200]">
+              {ghs(active.amount)} · {active.readyAt <= Date.now() ? 'ready to withdraw' : `cooling-off until ${new Date(active.readyAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`}
+            </span>
+          </span>
+          <ChevronRight size={18} />
+        </button>
+      )}
+      {active?.status === 'released' && (
+        <div className="mb-3 rounded-[16px] bg-ada-soft px-4 py-3 text-[13.5px] leading-relaxed text-ada-dark">
+          <b>Emergency declared {longDate(new Date(active.declaredAt))}.</b> Your saving streak is paused and your WiseBadges are safe.
+          {active.topUp && ` Top-up plan: +${ghs(active.topUp.extra, 0)} a ${per ?? 'week'} for ${active.topUp.periods} ${per ?? 'week'}s.`}
+        </div>
+      )}
+      <div className={`${card} divide-y divide-[#eef0f1]`}>
+        <ToggleRow
+          title={`Safety slice${pct ? ` · ${pct}%` : ''}`}
+          desc={
+            !pct
+              ? `Put ${EMERGENCY.defaultSlice}% of each payment into your emergency pocket`
+              : pocket.full
+                ? `Your pocket is at your ${ghs(pocket.cap, 0)} limit, so 100% of each payment goes to ${goal.name}`
+                : example && per
+                  ? `${ghs(example.toPocket)} of each ${ghs(goal.plan!.amount, 0)} ${goal.plan!.frequency} payment goes to your pocket`
+                  : `${pct}% of each payment goes to your pocket`
+          }
+          on={pct > 0}
+          onChange={(v) => setSlice(goal.id, v ? EMERGENCY.defaultSlice : 0)}
+          disabled={!canContribute}
+        />
+        {pct > 0 && canContribute && (
+          <div className="flex gap-2 px-4 py-3">
+            {EMERGENCY.slices.map((n) => (
+              <Chip key={n} selected={pct === n} onClick={() => setSlice(goal.id, n)}>
+                {n}%
+              </Chip>
+            ))}
+          </div>
+        )}
+        <button type="button" onClick={() => setPocketOpen(true)} className="block w-full px-4 py-[14px] text-left active:bg-[#f7f9f9]">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[15px] font-semibold text-ink">Emergency pocket</p>
+            <p className="text-[13px] font-semibold text-ink">
+              {ghs(pocket.balance)} <span className="font-medium text-muted">of {ghs(pocket.cap, 0)}</span>
+            </p>
+          </div>
+          <Progress value={(pocket.balance / pocket.cap) * 100} />
+          <p className="text-[12.5px] text-muted">Shared by all your goals. Stops growing at your {ghs(pocket.cap, 0)} limit. Tap to change it.</p>
+        </button>
+        {locked && goal.saved > 0 && active?.status !== 'cooling' && (
+          <button type="button" onClick={() => navigate(`/adawise/goal/${goal.id}/emergency`)} className="flex w-full items-center justify-between px-4 py-[14px] text-left active:bg-[#f7f9f9]">
+            <span>
+              <span className="block text-[15px] font-semibold text-ink">I have an emergency</span>
+              <span className="block text-[13px] text-muted">
+                {active?.status === 'released' ? "This goal's emergency withdrawal is used. Your pocket is still there" : 'Pocket first, then one protected withdrawal from this goal'}
+              </span>
+            </span>
+            <span className="text-dot">
+              <ChevronRight size={18} />
+            </span>
+          </button>
+        )}
+      </div>
+    </>
   )
 }
 

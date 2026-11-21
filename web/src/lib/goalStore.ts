@@ -16,7 +16,7 @@ import {
 import { iso, toE164, todayIso, uid } from './format'
 import { api, auth } from './api'
 
-function createStore<T>(key: string, seed: T, migrate?: (raw: unknown) => T) {
+export function createStore<T>(key: string, seed: T, migrate?: (raw: unknown) => T) {
   const listeners = new Set<() => void>()
   let value: T = seed
   try {

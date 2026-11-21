@@ -135,7 +135,7 @@ export function RequestDetail() {
 }
 
 /** Plain white screen with a back button, for multi-stage flows */
-function FlowShell({ title, onBack, children, footer }: { title: string; onBack: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
+export function FlowShell({ title, onBack, children, footer }: { title: string; onBack: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <div className="font-ada relative flex h-full flex-col bg-[#f4f6f7]">
       <header className="ada-card-gradient shrink-0 pt-[env(safe-area-inset-top)] text-white">

@@ -196,6 +196,8 @@ export type Notice = {
 export const SHOW_PARTNER_SIDE = false
 /** The Save Me loan (borrowing against a fixed deposit) is switched off for now; flip to bring it back */
 export const SHOW_SAVE_ME_LOAN = false
+/** Emergency protection demo (safety slice, emergency pocket, emergency withdrawal); flip to hide it */
+export const SHOW_EMERGENCY = true
 
 /** Save Me terms a partner accepts (from the Adawise product doc) */
 export const SAVE_ME_TERMS = [

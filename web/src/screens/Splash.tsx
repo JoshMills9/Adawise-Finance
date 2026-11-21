@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { MomoLogo } from '../components/ui'
 import { session } from '../lib/session'
 import { resetAdawise } from "../lib/goalStore"
+import { resetEmergency } from '../lib/emergency'
 import { NAVY, useThemeColor } from '../lib/useThemeColor'
 
 export function Splash() {
@@ -14,6 +15,7 @@ export function Splash() {
     if (new URLSearchParams(window.location.search).has('reset')) {
       session.reset()
       resetAdawise()
+      resetEmergency()
     }
 
     const t = setTimeout(() => {

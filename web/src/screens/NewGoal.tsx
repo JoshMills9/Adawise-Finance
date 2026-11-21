@@ -3,9 +3,11 @@ import { PartnerGuideLink, PartnerGuideSheet } from '../components/partnerGuide'
 import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 import { ClockIcon, DropletIcon, LockIcon, UsersIcon } from '../components/icons'
-import { GOAL_TYPE_LABEL, MAX_PARTNERS, ghs, type Frequency, type Goal, type GoalType } from '../lib/demoData'
+import { GOAL_TYPE_LABEL, MAX_PARTNERS, SHOW_EMERGENCY, ghs, type Frequency, type Goal, type GoalType } from '../lib/demoData'
+import { EMERGENCY, capOf, contributeWithSlice, setPocketCap, setSlice, sliceTradeOff, usePocket, useEmergencyState } from '../lib/emergency'
+import { PocketCapPicker } from '../components/pocket'
 import { useToast } from '../components/ui'
-import { contributeToGoal, createGoal, errorText, invitePartner } from '../lib/adawise'
+import { createGoal, invitePartner } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
 import { AddContact } from '../components/contacts'
@@ -49,6 +51,10 @@ type Draft = {
   reminders: boolean
   /** Starts from the profile's interest-free preference; the user can change it for this goal */
   earnsInterest: boolean
+  /** Safety slice in percent (0 = off) */
+  slice: number
+  /** The user's pocket limit (shared by all goals; null = keep the current one) */
+  pocketCap: number | null
   partners: DraftPartner[]
   deposit: string
 }
@@ -95,7 +101,6 @@ export function NewGoal() {
   const [dir, setDir] = useState(1)
   const [paying, setPaying] = useState(false)
   const [created, setCreated] = useState<Goal | null>(null)
-  const [busy, setBusy] = useState(false)
   const [toast, toastNode] = useToast()
   const [guide, setGuide] = useState(false)
   // Set once the goal exists on the server, so a retried first deposit doesn't create it twice
@@ -110,6 +115,8 @@ export function NewGoal() {
     autoSave: true,
     reminders: true,
     earnsInterest: !(prefsStore.get()?.interestFree ?? false),
+    slice: SHOW_EMERGENCY ? EMERGENCY.defaultSlice : 0,
+    pocketCap: null,
     partners: [],
     deposit: '',
   })
@@ -133,12 +140,15 @@ export function NewGoal() {
     d.type !== null,
     d.months > 0,
     d.partners.every((p) => p.name.trim().length > 0 && p.role !== null),
-    deposit <= target,
+    // A first deposit is required: at least something, and no more than the target
+    deposit > 0 && deposit <= target,
   ][step]
 
   const go = (to: number) => {
     setDir(to > step ? 1 : -1)
     setStep(to)
+    // Reaching review: suggest one period's saving as the first deposit
+    if (to === STEPS.length - 1 && !amountOf(d.deposit)) set({ deposit: String(Math.min(perPeriod, target)) })
   }
   const back = () => (step === 0 ? exit() : go(step - 1))
 
@@ -155,6 +165,8 @@ export function NewGoal() {
       earnsInterest: d.earnsInterest,
       plan: { frequency: d.frequency, months: d.months, amount: perPeriod, autoSave: d.autoSave, reminders: d.reminders, startDate: todayIso() },
     })
+    if (d.slice) setSlice(g.id, d.slice)
+    if (d.slice && d.pocketCap !== null) setPocketCap(d.pocketCap)
     const results = await Promise.allSettled(d.partners.map((p) => invitePartner(g.id, p, p.role!)))
     const failed = d.partners.filter((_, i) => results[i]!.status === 'rejected').map((p) => firstName(p.name))
     if (failed.length) toast(`Couldn't invite ${failed.join(' and ')}. Try again from the goal.`)
@@ -164,18 +176,6 @@ export function NewGoal() {
       .map((p) => ({ name: firstName(p.name), initials: initials(p.name), role: p.role!, status: 'invited' as const }))
     saved.current = { ...g, partners: invited.length ? invited : g.partners }
     return saved.current
-  }
-
-  /** No first deposit: just create */
-  const create = async () => {
-    setBusy(true)
-    try {
-      setCreated(await createOnServer())
-    } catch (e) {
-      toast(errorText(e))
-    } finally {
-      setBusy(false)
-    }
   }
 
   if (created) return <Success goal={created} deposit={deposit} onDone={exit} />
@@ -210,7 +210,7 @@ export function NewGoal() {
           >
             {step === 0 && <StepGoal d={d} set={set} />}
             {step === 1 && <StepType d={d} set={set} target={target} onPickInterest={() => (pickedInterest.current = true)} />}
-            {step === 2 && <StepPlan d={d} set={set} perPeriod={perPeriod} per={freqLabel.per} />}
+            {step === 2 && <StepPlan d={d} set={set} perPeriod={perPeriod} per={freqLabel.per} target={target} />}
             {step === 3 && <StepPartner d={d} set={set} onGuide={() => setGuide(true)} />}
             {step === 4 && <StepReview d={d} set={set} target={target} perPeriod={perPeriod} per={freqLabel.per} goTo={go} />}
           </motion.div>
@@ -220,14 +220,13 @@ export function NewGoal() {
       {/* Footer actions */}
       <div className="shrink-0 border-t border-[#e6ebec] bg-white px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
         <PrimaryButton
-          disabled={!valid || busy}
+          disabled={!valid}
           onClick={() => {
             if (step < STEPS.length - 1) go(step + 1)
-            else if (deposit > 0) setPaying(true)
-            else void create()
+            else setPaying(true)
           }}
         >
-          {busy ? 'Creating goal…' : step === STEPS.length - 1 ? (deposit > 0 ? `Create goal & pay ${ghs(deposit)}` : 'Create goal') : 'Continue'}
+          {step === STEPS.length - 1 ? (deposit > 0 ? `Create goal & pay ${ghs(deposit)}` : 'Add a first deposit') : 'Continue'}
         </PrimaryButton>
         {step === 3 && (
           <button
@@ -249,7 +248,7 @@ export function NewGoal() {
         goalName={d.name.trim()}
         run={async (amt) => {
           const g = await createOnServer()
-          await contributeToGoal(g.id, amt)
+          await contributeWithSlice(g.id, amt)
         }}
         onCancel={() => setPaying(false)}
         onApproved={() => {
@@ -350,7 +349,7 @@ function StepType({ d, set, target, onPickInterest }: { d: Draft; set: (p: Parti
   )
 }
 
-function StepPlan({ d, set, perPeriod, per }: { d: Draft; set: (p: Partial<Draft>) => void; perPeriod: number; per: string }) {
+function StepPlan({ d, set, perPeriod, per, target }: { d: Draft; set: (p: Partial<Draft>) => void; perPeriod: number; per: string; target: number }) {
   const lockedPeriod = d.type === 'time-locked'
   return (
     <>
@@ -396,7 +395,72 @@ function StepPlan({ d, set, perPeriod, per }: { d: Draft; set: (p: Partial<Draft
         />
         <ToggleRow title="Reminders" desc="Get a nudge before each saving day" on={d.reminders} onChange={(v) => set({ reminders: v })} />
       </div>
+      {SHOW_EMERGENCY && <SafetySlice d={d} set={set} perPeriod={perPeriod} per={per} target={target} />}
     </>
+  )
+}
+
+/** Safety slice: part of each payment fills the user's one emergency pocket, with the cost shown as a date */
+function SafetySlice({ d, set, perPeriod, per, target }: { d: Draft; set: (p: Partial<Draft>) => void; perPeriod: number; per: string; target: number }) {
+  const pocket = usePocket()
+  const savedCap = capOf(useEmergencyState())
+  const cap = d.pocketCap ?? savedCap
+  const full = pocket.balance >= cap
+  const [editCap, setEditCap] = useState(false)
+  const on = d.slice > 0
+  const pct = on ? d.slice : EMERGENCY.defaultSlice
+  const t = sliceTradeOff({ target, perPeriod, months: d.months, frequency: d.frequency, pct, pocketNow: pocket.balance, cap })
+  const slicePer = Math.round(perPeriod * pct) / 100
+
+  const tradeOff = full
+    ? `Your pocket is already at your ${ghs(cap, 0)} limit, so all of every payment goes to this goal for now.`
+    : d.type === 'time-locked'
+      ? t.shortAtEnd > 0
+        ? `With a ${pct}% safety slice you'll have about ${ghs(t.shortAtEnd, 0)} less in this goal when it unlocks on ${longDate(addMonths(d.months))}.`
+        : `A ${pct}% safety slice won't change what you have when this goal unlocks.`
+      : t.extraPeriods > 0
+        ? `With a ${pct}% safety slice you reach your goal on ${longDate(t.sliceDate)} instead of ${longDate(t.baseDate)}.`
+        : `A ${pct}% safety slice won't change when you reach your goal.`
+
+  return (
+    <div className="mt-4 rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
+      <ToggleRow
+        title="Safety slice (recommended)"
+        desc={`Put ${pct}% of each payment, about ${ghs(slicePer)} a ${per}, into your emergency pocket`}
+        on={on}
+        onChange={(v) => set({ slice: v ? EMERGENCY.defaultSlice : 0 })}
+      />
+      {on && (
+        <div className="border-t border-[#eef0f1] px-4 pb-4 pt-3">
+          <div className="flex gap-2">
+            {EMERGENCY.slices.map((n) => (
+              <Chip key={n} selected={d.slice === n} onClick={() => set({ slice: n })}>
+                {n}%
+              </Chip>
+            ))}
+          </div>
+          <p className="mt-3 text-[13.5px] leading-relaxed text-ink">{target > 0 ? tradeOff : 'Set a target to see what this changes.'}</p>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted">
+            One payment, one schedule. Your pocket is shared by all your goals and you can use it any time life happens.
+          </p>
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#eef0f1] pt-3">
+            <span>
+              <span className="block text-[14px] font-semibold text-ada-dark">Pocket limit: {ghs(cap, 0)}</span>
+              <span className="block text-[12.5px] text-muted">Once it's full, 100% goes to your goals</span>
+            </span>
+            <button type="button" onClick={() => setEditCap((e) => !e)} className="text-[14px] font-semibold text-ada active:opacity-60">
+              {editCap ? 'Done' : 'Change'}
+            </button>
+          </div>
+          {editCap && (
+            <div className="mt-3">
+              <PocketCapPicker value={cap} onChange={(n) => set({ pocketCap: n })} balance={pocket.balance} />
+              <p className="mt-2 text-[12.5px] text-muted">This is one limit for your whole pocket, so it applies to all your goals.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -563,7 +627,7 @@ function StepReview({
 
   return (
     <>
-      <StepTitle title="Review your goal" subtitle="Check the details, then add a first deposit if you like." />
+      <StepTitle title="Review your goal" subtitle="Check the details, then make your first deposit to start the goal." />
 
       <div className="mt-5 rounded-[18px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
         <div className="flex items-center gap-3 border-b border-[#eef0f1] p-4">
@@ -580,6 +644,7 @@ function StepReview({
         <ReviewRow label="Unlocks" value={unlock} />
         <ReviewRow label="Plan" value={`${ghs(perPeriod, 0)} / ${per} for ${d.months} months`} onEdit={() => goTo(2)} />
         <ReviewRow label="Auto-save" value={d.autoSave ? 'On' : 'Off'} />
+        {SHOW_EMERGENCY && <ReviewRow label="Safety" value={d.slice ? `${d.slice}% to your pocket${d.pocketCap !== null ? `, limit ${ghs(d.pocketCap, 0)}` : ''}` : 'No safety slice'} onEdit={() => goTo(2)} />}
         <ReviewRow label="Interest" value={d.earnsInterest ? 'Earns milestone interest' : 'Interest-free'} onEdit={() => goTo(1)} />
         <ReviewRow
           label={d.partners.length > 1 ? 'Partners' : 'Partner'}
@@ -593,11 +658,8 @@ function StepReview({
         />
       </div>
 
-      <p className="mt-6 text-[14px] font-semibold text-ada-dark">First deposit (optional)</p>
+      <p className="mt-6 text-[14px] font-semibold text-ada-dark">First deposit</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        <Chip selected={!amountOf(d.deposit)} onClick={() => set({ deposit: '' })}>
-          Later
-        </Chip>
         {quick.map((n) => (
           <Chip key={n} selected={amountOf(d.deposit) === n} onClick={() => set({ deposit: String(n) })}>
             {ghs(n, 0)}

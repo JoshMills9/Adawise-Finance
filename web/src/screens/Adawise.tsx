@@ -31,11 +31,14 @@ import {
   type Goal,
   type SupportedGoal,
   withdrawRule,
+  SHOW_EMERGENCY,
 } from '../lib/demoData'
+import { contributeWithSlice, usePocket, withdrawFromPocket } from '../lib/emergency'
+import { PocketSheet } from '../components/pocket'
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
 import { CircleInvites } from '../components/circleInvites'
-import { ACTIVITY_LIMIT, EmptyState, HeartIcon, MoneySheet, Radio, Sheet, PrimaryButton, ShowAllToggle } from '../components/ada'
+import { ACTIVITY_LIMIT, EmptyState, HeartIcon, MoneySheet, Progress, Radio, Sheet, PrimaryButton, ShowAllToggle } from '../components/ada'
 import { AdaTabBar, TAB_BAR_SPACE } from './AdaTabs'
 import { contributeToGoal, depositToWallet, errorText, refreshAdawise, withdrawFromGoal, withdrawFromWallet } from '../lib/adawise'
 import { noticeStore, useBadges, useCircles, useGoals, useRequests, useSaveMe, useSupporting, useUnreadCount, useWallet, type WalletEntry } from "../lib/goalStore"
@@ -64,6 +67,10 @@ export function Adawise() {
   const pendingInvites = pending.filter((r) => r.kind === 'invite').length
   const pendingSaveMe = pending.filter((r) => r.kind === 'saveme').length
   const wallet = useWallet()
+  const pocket = usePocket()
+  // Pocket money sits in the wallet but is ring-fenced: plain wallet withdrawals leave it alone
+  const pocketHeld = SHOW_EMERGENCY ? pocket.balance : 0
+  const [pocketOpen, setPocketOpen] = useState(false)
   const [paying, setPaying] = useState<Goal | null>(null)
   const [withdrawing, setWithdrawing] = useState(false)
   const [source, setSource] = useState<WithdrawSource | null>(null)
@@ -165,8 +172,33 @@ export function Adawise() {
           </div>
         </section>
 
+        {/* ---- Emergency pocket (filled by safety slices) ---- */}
+        {SHOW_EMERGENCY && (
+          <section className="px-4 pt-4">
+            <button
+              type="button"
+              onClick={() => setPocketOpen(true)}
+              className="w-full rounded-[16px] bg-white px-4 py-[14px] text-left shadow-[0_2px_12px_rgba(0,0,0,0.06)] active:bg-[#f7f9f9]"
+            >
+              <span className="flex items-center gap-3">
+                <span className="text-ada-dark">
+                  <LifebuoyIcon size={22} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold text-ada-dark">Emergency pocket</span>
+                  <span className="block text-[12.5px] text-muted">{pocket.full ? 'At your limit. Payments now go 100% to your goals' : 'Fills from your safety slices'}</span>
+                </span>
+                <span className="shrink-0 text-[14.5px] font-bold text-ink">
+                  {money(pocket.balance)} <span className="text-[12px] font-medium text-muted">/ {ghs(pocket.cap, 0)}</span>
+                </span>
+              </span>
+              <Progress value={(pocket.balance / pocket.cap) * 100} className="mt-3" />
+            </button>
+          </section>
+        )}
+
         {/* ---- Quick actions ---- */}
-        <section className="grid grid-cols-2 gap-3 px-4 pt-4">
+        <section className={`grid grid-cols-2 gap-3 px-4 ${SHOW_EMERGENCY ? 'pt-3' : 'pt-4'}`}>
           <QuickAction icon={FlagIcon} title="Create goal" subtitle="On your own" onClick={() => navigate("/adawise/new-goal")} />
           <QuickAction icon={UsersIcon} title="Create circle" subtitle="With others" onClick={() => navigate("/adawise/new-circle")} />
         </section>
@@ -293,7 +325,7 @@ export function Adawise() {
         title="Confirm payment"
         to={paying?.name ?? ''}
         fixedAmount={paying?.nextContribution?.amount}
-        run={(amt) => contributeToGoal(paying!.id, amt)}
+        run={(amt) => (SHOW_EMERGENCY ? contributeWithSlice(paying!.id, amt) : contributeToGoal(paying!.id, amt))}
         onClose={() => setPaying(null)}
         onDone={(amt) => {
           toast(`${ghs(amt)} saved to ${paying?.name}`)
@@ -318,7 +350,8 @@ export function Adawise() {
       <WithdrawSourceSheet
         open={withdrawing}
         goals={goals}
-        walletBalance={wallet.balance}
+        walletBalance={Math.max(0, wallet.balance - pocketHeld)}
+        pocketBalance={pocketHeld}
         onClose={() => setWithdrawing(false)}
         onPick={(src) => {
           setWithdrawing(false)
@@ -329,15 +362,25 @@ export function Adawise() {
         open={source !== null}
         mode="withdraw"
         title="Withdraw"
-        to={source?.kind === 'goal' ? source.goal.name : 'Wallet'}
+        to={source?.kind === 'goal' ? source.goal.name : source?.kind === 'pocket' ? 'Emergency pocket' : 'Wallet'}
         max={source ? sourceAmount(source) : undefined}
-        run={(amt) => (source?.kind === 'goal' ? withdrawFromGoal(source.goal.id, amt) : withdrawFromWallet(amt))}
+        run={(amt) => (source?.kind === 'goal' ? withdrawFromGoal(source.goal.id, amt) : source?.kind === 'pocket' ? withdrawFromPocket(amt) : withdrawFromWallet(amt))}
         onClose={() => setSource(null)}
         onDone={(amt) => {
           toast(`${ghs(amt)} sent to your MoMo wallet`)
           setSource(null)
         }}
       />
+      {SHOW_EMERGENCY && (
+        <PocketSheet
+          open={pocketOpen}
+          onClose={() => setPocketOpen(false)}
+          onWithdraw={() => {
+            setPocketOpen(false)
+            setSource({ kind: 'pocket', amount: pocket.balance })
+          }}
+        />
+      )}
       <AdaTabBar />
       {toastNode}
     </div>
@@ -422,14 +465,6 @@ function SectionHeader({ title, onMore }: { title: string; onMore: () => void })
       <button type="button" aria-label={`See all ${title}`} onClick={onMore} className="text-ink active:opacity-60">
         <ChevronRight size={22} />
       </button>
-    </div>
-  )
-}
-
-function Progress({ value }: { value: number }) {
-  return (
-    <div className="my-[10px] h-[7px] overflow-hidden rounded-full bg-[#e6ebec]">
-      <div className="h-full rounded-full bg-ada" style={{ width: `${Math.min(100, value)}%` }} />
     </div>
   )
 }
@@ -589,7 +624,7 @@ export function SupportedCard({ goal: s, onCheer }: { goal: SupportedGoal; onChe
 
 /* ---------- withdraw ---------- */
 
-type WithdrawSource = { kind: 'wallet'; amount: number } | { kind: 'goal'; goal: Goal }
+type WithdrawSource = { kind: 'wallet'; amount: number } | { kind: 'pocket'; amount: number } | { kind: 'goal'; goal: Goal }
 const sourceAmount = (s: WithdrawSource) => (s.kind === 'goal' ? s.goal.saved : s.amount)
 
 /** Where to withdraw from: the Adawise wallet, or any goal that's unlocked right now */
@@ -597,12 +632,14 @@ function WithdrawSourceSheet({
   open,
   goals,
   walletBalance,
+  pocketBalance,
   onClose,
   onPick,
 }: {
   open: boolean
   goals: Goal[]
   walletBalance: number
+  pocketBalance: number
   onClose: () => void
   onPick: (s: WithdrawSource) => void
 }) {
@@ -611,6 +648,7 @@ function WithdrawSourceSheet({
   const lockedCount = goals.filter((g) => g.saved > 0 && !withdrawRule(g).allowed).length
   const options: { id: string; title: string; sub: string; amount: number; src: WithdrawSource }[] = [
     ...(walletBalance > 0 ? [{ id: 'wallet', title: 'Adawise wallet', sub: 'Your deposits', amount: walletBalance, src: { kind: 'wallet', amount: walletBalance } as const }] : []),
+    ...(pocketBalance > 0 ? [{ id: 'pocket', title: 'Emergency pocket', sub: 'From your safety slices', amount: pocketBalance, src: { kind: 'pocket', amount: pocketBalance } as const }] : []),
     ...unlocked.map((g) => ({ id: g.id, title: g.name, sub: withdrawRule(g).reason, amount: g.saved, src: { kind: 'goal', goal: g } as const })),
   ]
   const choice = options.find((o) => o.id === picked)
