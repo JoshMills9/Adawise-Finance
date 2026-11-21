@@ -45,6 +45,8 @@ export type Goal = {
   activity?: Activity[]
   /** Milestone progress reported by the API (overrides the local maths when present) */
   milestones?: { months: number; interest: number; earned: number[] }
+  /** False for interest-free goals: milestones are still reached, but pay no interest. Can be turned off, never back on. */
+  earnsInterest?: boolean
   /** Lock state reported by the API (overrides the local lock maths when present) */
   lock?: { locked: boolean; message?: string }
   /** Active Save Me credit taken against this goal's fixed deposit */

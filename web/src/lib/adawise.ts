@@ -3,7 +3,7 @@
 import { api, ApiError, auth, firstDetail, fromMoney, list, toMoney, waitForPayment, type ApiUser, type PaymentAttempt } from './api'
 import { ghs, type Activity, type Circle, type Frequency, type Goal, type GoalType, type Notice, type Partner } from './demoData'
 import { firstName, initials, iso, isPhone, toE164 } from './format'
-import { badgeStore, circleInviteStore, circleStore, contactStore, goalStore, noticeStore, profileStore, saveMeStore, walletStore, type WalletEntry } from './goalStore'
+import { badgeStore, circleInviteStore, circleStore, contactStore, goalStore, noticeStore, prefsStore, profileStore, saveMeStore, walletStore, type WalletEntry } from './goalStore'
 
 /* ---------- API shapes (only the fields the app reads) ---------- */
 
@@ -44,6 +44,8 @@ export type ApiGoal = {
   can_contribute?: boolean
   can_withdraw?: boolean
   can_save_me?: boolean
+  /** False for interest-free goals (milestones still count, no interest is paid) */
+  earns_interest?: boolean
   lock_state?: { locked: boolean; amount_to_go: string | null; unlocks_on: string | null; message: string } | null
   schedule?: ApiSchedule | null
   partners?: unknown[]
@@ -131,6 +133,7 @@ export function toGoal(g: ApiGoal, prev?: Goal): Goal {
         : { contribute: g.can_contribute ?? true, withdraw: g.can_withdraw ?? true, saveMe: g.can_save_me ?? true },
     percent: g.percent_of_target !== undefined ? fromMoney(g.percent_of_target) : undefined,
     lock: g.lock_state ? { locked: g.lock_state.locked, message: g.lock_state.message } : undefined,
+    earnsInterest: g.earns_interest ?? prev?.earnsInterest ?? true,
     // Not in GoalRead: kept from the last /activity fetch and the local loan demo
     activity: prev?.activity,
     credit: prev?.credit,
@@ -151,6 +154,8 @@ const GOAL_KIND: Partial<Record<ApiRecordKind, Activity['kind']>> = {
 export const toGoalActivity = (records: ApiRecord[]): Activity[] =>
   records.flatMap((r) => {
     const kind = GOAL_KIND[r.kind]
+    // An interest-free goal's milestone can come back as a 0.00 interest record: nothing to show
+    if (kind === 'interest' && fromMoney(r.amount) === 0) return []
     return kind ? [{ id: r.id, kind, amount: fromMoney(r.amount), date: day(r.created_at) }] : []
   })
 
@@ -193,7 +198,7 @@ export function toWalletFeed(records: ApiRecord[]): WalletEntry[] {
         break
       case 'interest':
       case 'milestone_interest':
-        out.push({ id: r.id, kind: 'interest', amount, date, goalId: r.goal_id ?? undefined })
+        if (amount > 0) out.push({ id: r.id, kind: 'interest', amount, date, goalId: r.goal_id ?? undefined })
         break
       case 'loan_proceeds':
         out.push({ id: r.id, kind: 'credit', amount, date, goalId: r.goal_id ?? undefined })
@@ -264,7 +269,7 @@ export async function refreshWallet() {
 
 /** Everything the Adawise home and tabs show. One failing area doesn't stop the others. */
 export async function refreshAdawise() {
-  const results = await Promise.allSettled([refreshGoals(), refreshWallet(), refreshCircles(), refreshCircleInvites(), refreshNotices(), refreshSaveMe(), refreshBadges(), refreshProfile()])
+  const results = await Promise.allSettled([refreshGoals(), refreshWallet(), refreshCircles(), refreshCircleInvites(), refreshNotices(), refreshSaveMe(), refreshBadges(), refreshProfile(), refreshPrefs()])
   const failed = results.find((r) => r.status === 'rejected')
   if (failed) throw failed.reason
 }
@@ -351,6 +356,35 @@ type ApiProfile = { name: string; phone: string; total_saved: string; goals_coun
 export async function refreshProfile() {
   const p = await api.get<ApiProfile>('/profile/')
   profileStore.replace({ name: p.name, phone: p.phone, totalSaved: fromMoney(p.total_saved), goals: p.goals_count, circles: p.circles_count, loanOwed: fromMoney(p.loan?.owed) })
+}
+
+/* ---------- your preferences (/me) ---------- */
+
+type ApiMe = { prefers_interest_free?: boolean }
+
+export async function refreshPrefs() {
+  const me = await api.get<ApiMe>('/me')
+  prefsStore.replace({ interestFree: !!me.prefers_interest_free })
+}
+
+/** The "Interest-free savings" switch. Only affects goals created afterwards. Optimistic, rolled back if refused. */
+export async function setInterestFree(on: boolean) {
+  const before = prefsStore.get()
+  prefsStore.replace({ interestFree: on })
+  try {
+    const me = await api.patch<ApiMe>('/me', { prefers_interest_free: on })
+    prefsStore.replace({ interestFree: !!me.prefers_interest_free })
+  } catch (e) {
+    if (before) prefsStore.replace(before)
+    throw e
+  }
+}
+
+/** Makes a goal interest-free. One way only: the API won't turn interest back on (400 interest_cannot_be_reenabled). */
+export async function makeGoalInterestFree(goalId: string) {
+  const g = await api.patch<ApiGoal>(`/goals/${goalId}/`, { earns_interest: false })
+  const prev = goalStore.all().find((x) => x.id === goalId)
+  goalStore.upsert(toGoal(g, prev))
 }
 
 /* ---------- WiseCircles ---------- */
@@ -626,6 +660,8 @@ export type NewGoalInput = {
   type: GoalType
   target: number
   endDate?: string
+  /** Leave out to follow the profile's interest-free preference */
+  earnsInterest?: boolean
   plan: { frequency: Frequency; months: number; amount: number; autoSave: boolean; reminders: boolean; startDate: string }
 }
 
@@ -636,6 +672,7 @@ export async function createGoal(input: NewGoalInput): Promise<Goal> {
     type: TYPE_OUT[input.type],
     target: toMoney(input.target),
     end_date: input.endDate ?? null,
+    ...(input.earnsInterest !== undefined && { earns_interest: input.earnsInterest }),
     schedule: {
       amount_per_period: toMoney(input.plan.amount),
       frequency: input.plan.frequency,
@@ -670,6 +707,7 @@ export async function updateGoalSettings(goalId: string, patch: { autoSave?: boo
 
 function friendlyBase(e: ApiError) {
   if (e.code === 'invite_limit' || e.status === 429) return "You've reached today's invite limit, or invited this person a moment ago. Wait a little or try again tomorrow."
+  if (e.code === 'interest_cannot_be_reenabled') return "Interest can't be turned back on for this goal."
   if (e.code === 'partner_opted_out') return 'One of the people you invited has opted out of SMS invites from Adawise. Remove them or use a different number.'
   if (e.status === 401) return 'Your session has ended. Please sign in again.'
   if (e.status === 403) return "You don't have permission to do that."

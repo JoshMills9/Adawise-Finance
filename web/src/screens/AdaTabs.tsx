@@ -1,12 +1,13 @@
 // Adawise bottom tabs (Home, Goals, Circles, Profile) and the Goals, Circles and Profile tab screens.
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ADA_DARK, Chip, DEMO_NAME, DEMO_WALLET, EmptyState, card } from '../components/ada'
+import { ADA_DARK, Chip, DEMO_NAME, DEMO_WALLET, EmptyState, ToggleRow, card } from '../components/ada'
+import { useToast } from '../components/ui'
 import { ChevronRight, FlagIcon, HomeIcon, PlusIcon, ProfileIcon, SearchIcon, UsersIcon } from '../components/icons'
 import { GOAL_TYPE_LABEL, SHOW_PARTNER_SIDE, SHOW_SAVE_ME_LOAN, creditLeft, circleProgress, ghs, totals, type Frequency, type GoalType } from '../lib/demoData'
-import { signOutAdawise, useBadges, useCircles, useGoals, useProfile, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
+import { signOutAdawise, useBadges, useCircles, useGoals, usePrefs, useProfile, useRequests, useSaveMe, useSupporting, useUnreadCount } from '../lib/goalStore'
 import { auth } from '../lib/api'
-import { refreshAdawise } from '../lib/adawise'
+import { errorText, refreshAdawise, setInterestFree } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CircleCard, GoalCard } from './Adawise'
 
@@ -270,6 +271,8 @@ export function ProfileTab() {
   const owed = goals.reduce((t, g) => t + (g.credit ? creditLeft(g.credit) : 0), 0)
   const earnedBadges = badges.filter((b) => b.earned).length
   const profile = useProfile()
+  const prefs = usePrefs()
+  const [toast, toastNode] = useToast()
   const name = profile?.name || auth.user()?.name || DEMO_NAME
   const total = profile?.totalSaved ?? totals(goals).total
   const owedNow = Math.max(owed, profile?.loanOwed ?? 0)
@@ -315,6 +318,18 @@ export function ProfileTab() {
       </section>
 
       <section className="mx-4 mt-4 divide-y divide-[#eef0f1] overflow-hidden rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+        <ToggleRow
+          title="Interest-free savings"
+          desc="New goals won't earn milestone interest. Goals you already have don't change."
+          on={prefs?.interestFree ?? false}
+          onChange={(v) =>
+            setInterestFree(v).then(
+              () => toast(v ? 'New goals will be interest-free' : 'New goals will earn milestone interest'),
+              (e) => toast(errorText(e)),
+            )
+          }
+          disabled={!prefs}
+        />
         <Row label="Save Me" note={`${saveMe.left} of ${saveMe.allowed} left this year`} />
         <Row
           label="Back to MoMo"
@@ -325,6 +340,7 @@ export function ProfileTab() {
           }}
         />
       </section>
+      {toastNode}
     </TabScreen>
   )
 }

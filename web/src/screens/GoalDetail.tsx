@@ -53,11 +53,11 @@ import { goalStore, useContacts, useGoal, useSaveMe, walletStore } from '../lib/
 import { AddContact } from '../components/contacts'
 import { EditInviteSheet } from '../components/editInvite'
 import { ApiError } from '../lib/api'
-import { removePartner, resendPartnerInvite, editPartnerInvite, withdrawAllAndClose, askPartners, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal } from '../lib/adawise'
+import { removePartner, resendPartnerInvite, editPartnerInvite, withdrawAllAndClose, askPartners, cancelSaveMe, type SaveMeStatus, contributeToGoal, errorText, invitePartner, refreshGoal, refreshSaveMe, saveMeRequest, updateGoalSettings, withdrawFromGoal, makeGoalInterestFree } from '../lib/adawise'
 import { useThemeColor } from '../lib/useThemeColor'
 import { CheckMark, Glyph } from '../components/goalIcons'
 
-type SheetName = null | 'deposit' | 'withdraw' | 'locked' | 'saveme' | 'partner' | 'close'
+type SheetName = null | 'deposit' | 'withdraw' | 'locked' | 'saveme' | 'partner' | 'close' | 'interest'
 
 const TYPE_ICON: Record<Goal['type'], Icon> = { flexible: DropletIcon, 'goal-locked': LockIcon, 'time-locked': ClockIcon }
 
@@ -257,6 +257,16 @@ export function GoalDetail() {
           {/* Milestones */}
           <SectionTitle title="Milestones" />
           <Milestones goal={goal} />
+          <div className={`${card} mt-3`}>
+            <ToggleRow
+              title="Earn milestone interest"
+              desc={goal.earnsInterest !== false ? 'Paid upfront at each milestone' : "This goal is interest-free. Interest can't be turned back on for this goal."}
+              on={goal.earnsInterest !== false}
+              // One way only: switching off asks first, and there's no switching back on
+              onChange={(v) => !v && setSheet('interest')}
+              disabled={goal.earnsInterest === false}
+            />
+          </div>
 
           {/* Partners */}
           <SectionTitle title="Accountability partners" action={<span className="text-[13px] text-muted">{goal.partners?.length ?? 0} of {MAX_PARTNERS}</span>} />
@@ -370,6 +380,19 @@ export function GoalDetail() {
           Keep saving
         </button>
       </Sheet>
+      <ConfirmSheet
+        open={sheet === 'interest'}
+        title="Make this goal interest-free?"
+        text="It still reaches its 3, 6, 9 and 12-month milestones, but won't earn interest at them. Interest can't be turned back on for this goal."
+        confirmLabel="Make it interest-free"
+        busyTitle="Updating your goal…"
+        run={() => makeGoalInterestFree(goal.id)}
+        onClose={() => setSheet(null)}
+        onDone={() => {
+          setSheet(null)
+          toast(`${goal.name} is now interest-free`)
+        }}
+      />
       <ConfirmSheet
         open={sheet === 'close'}
         title={`Close ${goal.name}?`}
@@ -748,6 +771,8 @@ function Milestones({ goal }: { goal: Goal }) {
   const interest = goal.milestones?.interest ?? (goal.activity ?? []).filter((a) => a.kind === 'interest').reduce((s, a) => s + a.amount, 0)
   const reached = (m: number) => (goal.milestones ? goal.milestones.earned.includes(m) : months >= m)
   const next = MILESTONES.find((m) => !reached(m))
+  const earns = goal.earnsInterest !== false
+  const last = [...MILESTONES].reverse().find(reached)
   return (
     <div className={`${card} p-4`}>
       <div className="relative flex justify-between">
@@ -771,13 +796,14 @@ function Milestones({ goal }: { goal: Goal }) {
       <p className="mt-4 text-[13.5px] leading-relaxed text-ink">
         {next ? (
           <>
-            {reached(3) ? 'Savings are in a fixed deposit. ' : ''}Next milestone in <b>{Math.max(1, next - months)} month{Math.max(1, next - months) === 1 ? '' : 's'}</b>. Keep saving to earn interest, paid upfront.
+            {reached(3) ? 'Savings are in a fixed deposit. ' : ''}{!earns && last ? `${last}-month milestone reached. ` : ''}Next milestone in <b>{Math.max(1, next - months)} month{Math.max(1, next - months) === 1 ? '' : 's'}</b>.
+            {earns ? ' Keep saving to earn interest, paid upfront.' : ''}
           </>
         ) : (
           'All milestones reached. Brilliant consistency!'
         )}
       </p>
-      {interest > 0 && <p className="mt-2 text-[13px] font-semibold text-ada-dark">Interest paid upfront so far: {ghs(interest)}</p>}
+      {earns && interest > 0 && <p className="mt-2 text-[13px] font-semibold text-ada-dark">Interest paid upfront so far: {ghs(interest)}</p>}
     </div>
   )
 }

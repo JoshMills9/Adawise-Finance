@@ -9,7 +9,7 @@ import { contributeToGoal, createGoal, errorText, invitePartner } from '../lib/a
 import { useThemeColor } from '../lib/useThemeColor'
 import { Glyph } from '../components/goalIcons'
 import { AddContact } from '../components/contacts'
-import { useContacts } from '../lib/goalStore'
+import { prefsStore, useContacts, usePrefs } from '../lib/goalStore'
 import {
   ADA_DARK,
   Check,
@@ -47,6 +47,8 @@ type Draft = {
   frequency: Frequency
   autoSave: boolean
   reminders: boolean
+  /** Starts from the profile's interest-free preference; the user can change it for this goal */
+  earnsInterest: boolean
   partners: DraftPartner[]
   deposit: string
 }
@@ -107,10 +109,17 @@ export function NewGoal() {
     frequency: 'weekly',
     autoSave: true,
     reminders: true,
+    earnsInterest: !(prefsStore.get()?.interestFree ?? false),
     partners: [],
     deposit: '',
   })
   const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }))
+  // If the preference loads after the form opened, follow it until the user picks for themselves
+  const prefs = usePrefs()
+  const pickedInterest = useRef(false)
+  useEffect(() => {
+    if (prefs && !pickedInterest.current) setD((prev) => ({ ...prev, earnsInterest: !prefs.interestFree }))
+  }, [prefs])
   // Back to wherever the flow was opened from; Adawise home if opened directly
   const exit = () => goBack(navigate)
 
@@ -142,6 +151,8 @@ export function NewGoal() {
       type: d.type!,
       target,
       endDate: d.type === 'time-locked' ? iso(addMonths(d.months)) : undefined,
+      // Always sent, so the goal matches exactly what the user saw on screen
+      earnsInterest: d.earnsInterest,
       plan: { frequency: d.frequency, months: d.months, amount: perPeriod, autoSave: d.autoSave, reminders: d.reminders, startDate: todayIso() },
     })
     const results = await Promise.allSettled(d.partners.map((p) => invitePartner(g.id, p, p.role!)))
@@ -198,7 +209,7 @@ export function NewGoal() {
             className="px-4 pb-6 pt-5"
           >
             {step === 0 && <StepGoal d={d} set={set} />}
-            {step === 1 && <StepType d={d} set={set} target={target} />}
+            {step === 1 && <StepType d={d} set={set} target={target} onPickInterest={() => (pickedInterest.current = true)} />}
             {step === 2 && <StepPlan d={d} set={set} perPeriod={perPeriod} per={freqLabel.per} />}
             {step === 3 && <StepPartner d={d} set={set} onGuide={() => setGuide(true)} />}
             {step === 4 && <StepReview d={d} set={set} target={target} perPeriod={perPeriod} per={freqLabel.per} goTo={go} />}
@@ -291,7 +302,7 @@ function StepGoal({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
   )
 }
 
-function StepType({ d, set, target }: { d: Draft; set: (p: Partial<Draft>) => void; target: number }) {
+function StepType({ d, set, target, onPickInterest }: { d: Draft; set: (p: Partial<Draft>) => void; target: number; onPickInterest: () => void }) {
   return (
     <>
       <StepTitle title="How do you want to save?" subtitle="Choose how strict your goal should be. You can't change this later." />
@@ -319,7 +330,22 @@ function StepType({ d, set, target }: { d: Draft; set: (p: Partial<Draft>) => vo
         )}
       </AnimatePresence>
 
-      <Note>Savings you keep for 3, 6, 9 or 12 months reach a milestone and can earn interest, paid upfront.</Note>
+      <div className="mt-6 rounded-[16px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
+        <ToggleRow
+          title="Earn milestone interest"
+          desc={d.earnsInterest ? 'Paid upfront at 3, 6, 9 and 12 months' : 'Interest-free: milestones still count, with no interest'}
+          on={d.earnsInterest}
+          onChange={(v) => {
+            onPickInterest()
+            set({ earnsInterest: v })
+          }}
+        />
+      </div>
+      <Note>
+        {d.earnsInterest
+          ? 'Savings you keep for 3, 6, 9 or 12 months reach a milestone and can earn interest, paid upfront.'
+          : "Savings you keep for 3, 6, 9 or 12 months still reach each milestone. You can't turn interest on for this goal later."}
+      </Note>
     </>
   )
 }
@@ -554,6 +580,7 @@ function StepReview({
         <ReviewRow label="Unlocks" value={unlock} />
         <ReviewRow label="Plan" value={`${ghs(perPeriod, 0)} / ${per} for ${d.months} months`} onEdit={() => goTo(2)} />
         <ReviewRow label="Auto-save" value={d.autoSave ? 'On' : 'Off'} />
+        <ReviewRow label="Interest" value={d.earnsInterest ? 'Earns milestone interest' : 'Interest-free'} onEdit={() => goTo(1)} />
         <ReviewRow
           label={d.partners.length > 1 ? 'Partners' : 'Partner'}
           value={

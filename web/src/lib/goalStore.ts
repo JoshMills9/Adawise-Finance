@@ -312,6 +312,12 @@ const profileApi = createStore<Profile | null>('adawise.api.profile', null)
 export const profileStore = { replace: (p: Profile) => profileApi.set(p), reset: profileApi.reset }
 export const useProfile = () => profileApi.useValue()
 
+/** The user's own settings from GET /me. `interestFree`: new goals default to no interest (existing goals keep theirs). */
+export type Prefs = { interestFree: boolean }
+const prefsApi = createStore<Prefs | null>('adawise.api.prefs', null)
+export const prefsStore = { get: prefsApi.get, replace: (p: Prefs) => prefsApi.set(p), reset: prefsApi.reset }
+export const usePrefs = () => prefsApi.useValue()
+
 /* ---------- contacts the user has added (kept on this device, per signed-in user) ---------- */
 
 /** Phone is stored in E.164 (+233…) */
@@ -347,6 +353,7 @@ export function signOutAdawise() {
   saveMeStore.reset()
   badgeStore.reset()
   profileStore.reset()
+  prefsStore.reset()
 }
 
 /** Clears everything created during a demo (used by ?reset) */
